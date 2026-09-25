@@ -10,6 +10,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
