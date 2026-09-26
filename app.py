@@ -4,6 +4,7 @@ FloatChat 🌊 — Streamlit Frontend
 Main entry point. Run with: streamlit run app.py
 """
 
+import torch
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))

@@ -6,6 +6,7 @@ RAG pipeline: semantic search over ARGO profiles + Groq LLM for answers.
 
 from __future__ import annotations
 
+import torch
 import json
 import os
 import numpy as np
@@ -29,12 +30,15 @@ def _load_resources():
     global _model, _summaries, _embeddings, _df
 
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        try:
+            _model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+        except Exception:
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
 
     if _summaries is None:
         summary_path = INDEX_DIR / "summaries.json"
         if summary_path.exists():
-            with open(summary_path) as f:
+            with open(summary_path, encoding="utf-8") as f:
                 _summaries = json.load(f)
         else:
             _summaries = []

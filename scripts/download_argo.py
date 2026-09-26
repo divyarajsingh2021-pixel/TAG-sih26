@@ -82,9 +82,9 @@ def main():
     df = generate_synthetic_argo_data(n_floats=60, profiles_per_float=15)
     out_path = OUTPUT_DIR / "argo_indian_ocean.parquet"
     df.to_parquet(out_path, index=False)
-    print(f"Saved {len(df):,} records → {out_path}")
+    print(f"Saved {len(df):,} records -> {out_path}")
     print(f"Floats: {df['float_id'].nunique()}")
-    print(f"Date range: {df['date'].min().date()} → {df['date'].max().date()}")
+    print(f"Date range: {df['date'].min().date()} -> {df['date'].max().date()}")
     print(f"Regions: {df['region'].unique().tolist()}")
     return df
 

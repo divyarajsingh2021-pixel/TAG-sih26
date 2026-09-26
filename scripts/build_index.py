@@ -5,6 +5,7 @@ Builds a FAISS vector index from ARGO profile summaries.
 Run once after downloading data.
 """
 
+import torch
 import os
 import json
 import pickle
@@ -79,13 +80,14 @@ def build_index():
         faiss.write_index(index, str(INDEX_DIR / "argo.index"))
         print(f"  FAISS index saved ({index.ntotal} vectors)")
     except ImportError:
-        print("  FAISS not available — using numpy fallback")
-        np.save(str(INDEX_DIR / "embeddings.npy"), embeddings)
+        print("  FAISS not available - using numpy fallback")
+
+    np.save(str(INDEX_DIR / "embeddings.npy"), embeddings)
 
     # Save metadata
-    with open(INDEX_DIR / "summaries.json", "w") as f:
+    with open(INDEX_DIR / "summaries.json", "w", encoding="utf-8") as f:
         json.dump(summaries, f, indent=2)
-    print(f"  Metadata saved → {INDEX_DIR / 'summaries.json'}")
+    print(f"  Metadata saved -> {INDEX_DIR / 'summaries.json'}")
     print("Index build complete!")
 
 
