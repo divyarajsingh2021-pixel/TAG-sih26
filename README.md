@@ -172,21 +172,13 @@ GROQ_API_KEY = "gsk_your_key_here"
 ---
 
 ## 👥 Team
-
-| Member | Role |
-|---|---|
-| Member 1 | Data engineering, ARGO pipeline |
-| Member 2 | RAG pipeline, Groq LLM integration |
-| Member 3 | Streamlit UI, visualizations |
-| Member 4 | Query routing, FAISS indexing |
-| Member 5 | Evaluation, documentation |
-
+TEAM OUTRAGE
 ---
 
 ## 🏆 Hackathon
 
 Built for **SIH 2026** — Problem Statement 1
-Organized by **MLSU** | March–April 2026
+Organized by **MLSU** | 2026
 
 ---
 
