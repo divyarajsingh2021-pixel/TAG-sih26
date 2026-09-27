@@ -108,47 +108,6 @@ floatchat/
 
 ---
 
-## ⚡ Setup & Installation
-
-### 1. Clone the repo
-```bash
-git clone https://github.com/Gaurav711/floatchat.git
-cd floatchat
-```
-
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Get your free Groq API key
-Go to [console.groq.com](https://console.groq.com) → sign up → Create API Key (free, no card needed)
-
-### 4. Add your API key
-
-**Option A — secrets.toml (for local dev):**
-```toml
-# .streamlit/secrets.toml
-GROQ_API_KEY = "gsk_your_key_here"
-```
-
-**Option B — paste in the app sidebar** (no file editing needed)
-
-### 5. Generate data & build index
-```bash
-python scripts/download_argo.py
-python scripts/build_index.py
-```
-
-### 6. Run the app
-```bash
-streamlit run app.py
-```
-
-Visit `http://localhost:8501` 🎉
-
----
-
 ## ✨ Key Features
 
 - **💬 Natural language chat** — Ask oceanography questions in plain English
@@ -226,8 +185,8 @@ GROQ_API_KEY = "gsk_your_key_here"
 
 ## 🏆 Hackathon
 
-Built for **Neural Nexus AI/ML Hackathon** — Problem Statement 1
-Organized by **IIT Jammu** | March–April 2026
+Built for **SIH 2026** — Problem Statement 1
+Organized by **MLSU** | March–April 2026
 
 ---
 
