@@ -234,3 +234,86 @@ def plot_ts_diagram(region: str = "All") -> go.Figure:
     fig.update_traces(marker=dict(size=4))
     fig.update_layout(height=450, template="plotly_white")
     return fig
+
+
+# ── 3D Globe ──────────────────────────────────────────────────────────────────
+
+def plot_globe(region: str = "All", month: int = 0) -> go.Figure:
+    """
+    3D interactive globe showing ARGO float positions.
+    Uses Plotly go.Scattergeo with orthographic projection.
+    PyDeck's globe view was not used because it requires mapbox tokens and has
+    known rendering issues inside Streamlit iframes. Plotly's orthographic
+    Scattergeo works entirely client-side with no API key, is fully interactive,
+    and renders identically in local and cloud deployments.
+    """
+    df = filter_data(region=region, month=month)
+    surface = df[df["depth_m"] == 0].copy() if not df.empty else df
+
+    if surface.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="No data available", x=0.5, y=0.5, showarrow=False)
+        return fig
+
+    # One marker per float (latest position)
+    sample = surface.groupby("float_id").last().reset_index()
+
+    # Colour scale: cold blue → warm red
+    fig = go.Figure()
+
+    fig.add_trace(go.Scattergeo(
+        lat=sample["latitude"],
+        lon=sample["longitude"],
+        mode="markers",
+        marker=dict(
+            size=8,
+            color=sample["temperature_c"],
+            colorscale="RdYlBu_r",
+            cmin=sample["temperature_c"].min(),
+            cmax=sample["temperature_c"].max(),
+            colorbar=dict(
+                title="SST (°C)",
+                thickness=15,
+                len=0.6,
+            ),
+            opacity=0.85,
+            line=dict(width=0.5, color="white"),
+        ),
+        text=[
+            f"<b>Float ID:</b> {row.float_id}<br>"
+            f"<b>Region:</b> {row.region}<br>"
+            f"<b>SST:</b> {row.temperature_c:.1f} °C<br>"
+            f"<b>Salinity:</b> {row.salinity_psu:.2f} PSU<br>"
+            f"<b>Date:</b> {str(row.date)[:10]}"
+            for row in sample.itertuples()
+        ],
+        hoverinfo="text",
+        name="ARGO Floats",
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text="🌍 ARGO Float Positions — 3D Globe View",
+            font=dict(size=16, color="#0077B6"),
+        ),
+        geo=dict(
+            projection_type="orthographic",
+            showland=True,
+            landcolor="#d4e6b5",
+            showocean=True,
+            oceancolor="#0077B6",
+            showlakes=True,
+            lakecolor="#90E0EF",
+            showcountries=True,
+            countrycolor="#aaaaaa",
+            showcoastlines=True,
+            coastlinecolor="#555555",
+            bgcolor="rgba(0,0,0,0)",
+            center=dict(lat=10, lon=75),   # Centre on Indian Ocean
+            projection_rotation=dict(lon=75, lat=10, roll=0),
+        ),
+        height=580,
+        margin=dict(l=0, r=0, t=50, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
