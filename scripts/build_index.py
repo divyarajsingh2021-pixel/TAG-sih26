@@ -5,7 +5,10 @@ Builds a FAISS vector index from ARGO profile summaries.
 Run once after downloading data.
 """
 
-import torch
+try:
+    import torch  # noqa: F401
+except (ImportError, OSError):
+    pass
 import os
 import json
 import pickle

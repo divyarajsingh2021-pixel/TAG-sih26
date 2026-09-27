@@ -6,7 +6,10 @@ RAG pipeline: semantic search over ARGO profiles + Groq LLM for answers.
 
 from __future__ import annotations
 
-import torch
+try:
+    import torch  # noqa: F401  -- must be first on Windows to avoid DLL issues
+except (ImportError, OSError):
+    pass
 import json
 import os
 import numpy as np

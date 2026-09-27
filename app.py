@@ -1,14 +1,19 @@
 """
-FloatChat 🌊  — Dolphin Ocean AI
+FloatChat 🌊  — Outrage Ocean AI
 =================================
 Pixel-perfect implementation matching the reference UI:
-- Left  : Chat Panel (Dolphin, Online indicator, Mic/Audio pills, styled bubbles, voice input)
+- Left  : Chat Panel (Outrage, Online indicator, Mic/Audio pills, styled bubbles, voice input)
 - Right : Toggleable between:
           1. ARGO Analytics Dashboard (Overview 6-metric cards, Yearly Trends, Regional Donut, 4 Tabs)
           2. Full Satellite Ocean Map (ESRI satellite tiles, yellow float markers, floating layer controls)
 """
 
-import torch  # Required first on Windows to avoid DLL load order issues
+# On Windows torch must be imported first to avoid DLL load issues. Safe no-op on Linux/cloud.
+try:
+    import torch  # noqa: F401
+except (ImportError, OSError):
+    pass
+
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 

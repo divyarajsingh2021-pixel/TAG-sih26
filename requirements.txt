@@ -1,13 +1,21 @@
-streamlit==1.32.0
-pandas==2.2.1
-numpy==1.26.4
-plotly==5.20.0
-sentence-transformers==2.7.0
-faiss-cpu==1.8.0
-groq==0.9.0
-python-dotenv==1.0.1
-pyarrow==15.0.2
-scipy==1.13.0
-streamlit-mic-recorder==0.0.8
-SpeechRecognition==3.17.0
+# ── Streamlit Cloud compatible requirements ────────────────────────────────
+# ⚠️  faiss-cpu removed — we use numpy cosine similarity as fallback (already in code)
+# ⚠️  torch removed — only needed locally on Windows for DLL load order
+# ⚠️  Versions are flexible ranges so pip can resolve on Python 3.11
+
+streamlit>=1.32.0,<1.42.0
+pandas>=2.1.0,<2.3.0
+numpy>=1.24.0,<2.0.0
+plotly>=5.20.0
+pyarrow>=14.0.0
+scipy>=1.11.0
+
+# Sentence Transformers (downloads all-MiniLM-L6-v2 on first boot)
+sentence-transformers>=2.7.0
+
+# Groq LLM API (must pin httpx to avoid proxies= argument crash)
+groq>=0.9.0
 httpx==0.27.2
+
+# Utils
+python-dotenv>=1.0.0
