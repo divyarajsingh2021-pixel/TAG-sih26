@@ -515,18 +515,49 @@ with col_left:
         if key_input:
             st.session_state.groq_key = key_input
         if st.session_state.groq_key:
-            st.success("✅ Groq Key Active (LLaMA3-70B)")
+            st.success("✅ Groq Key Active (Qwen-27B)")
         else:
             st.warning("⚠️ Enter key for AI generation")
 
-    # Suggested Prompts (chips)
-    st.markdown("<div style='padding: 6px 16px 0 16px; font-size: 12px; font-weight: 600; color: #6b7280;'>💡 Quick queries:</div>", unsafe_allow_html=True)
+    # ── Ocean Region Selector ─────────────────────────────────────────────────
+    st.markdown("""
+    <div style="font-size:13px; font-weight:700; color:#1f2937; padding: 4px 0 4px 2px;">
+      🌊 Select Ocean Region for Analysis:
+    </div>
+    """, unsafe_allow_html=True)
+
+    OCEAN_OPTIONS = {
+        "🌍 All Regions": "All",
+        "🌊 Arabian Sea": "Arabian Sea",
+        "🌏 Bay of Bengal": "Bay of Bengal",
+        "🐠 Indian Ocean": "Indian Ocean",
+    }
+
+    ocean_cols = st.columns(len(OCEAN_OPTIONS))
+    for i, (label, val) in enumerate(OCEAN_OPTIONS.items()):
+        current = st.session_state.get("selected_ocean", "All")
+        btn_style = "primary" if current == val else "secondary"
+        if ocean_cols[i].button(label, key=f"ocean_{val}", use_container_width=True, type=btn_style):
+            st.session_state.selected_ocean = val
+            st.rerun()
+
+    # Show current ocean context label
+    sel_ocean = st.session_state.get("selected_ocean", "All")
+    ocean_display = sel_ocean if sel_ocean != "All" else "All Ocean Regions"
+    st.markdown(
+        f"<div style='font-size:11px; color:#6b7280; margin-bottom:4px;'>📍 Context: <b>{ocean_display}</b></div>",
+        unsafe_allow_html=True
+    )
+
+    # Suggested Prompts (chips) — dynamically use selected ocean
+    st.markdown("<div style='font-size: 12px; font-weight: 600; color: #6b7280; padding: 2px 0;'>💡 Quick queries:</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    if c1.button("Average SST in Arabian Sea?", key="chip_1", use_container_width=True):
-        st.session_state.prefill = "What is the average sea surface temperature in the Arabian Sea?"
+    chip_region = sel_ocean if sel_ocean != "All" else "Arabian Sea"
+    if c1.button(f"SST in {chip_region}?", key="chip_1", use_container_width=True):
+        st.session_state.prefill = f"What is the average sea surface temperature in the {chip_region}?"
         st.rerun()
-    if c2.button("Salinity profile near equator", key="chip_2", use_container_width=True):
-        st.session_state.prefill = "Show me salinity profile near the equator in 2023"
+    if c2.button("Salinity near equator", key="chip_2", use_container_width=True):
+        st.session_state.prefill = f"Show me salinity profile near the equator in the {chip_region}"
         st.rerun()
 
     # Chat Messages Stream
@@ -542,17 +573,9 @@ with col_left:
     st.markdown(chat_html, unsafe_allow_html=True)
 
     # ── Voice Speech Input (Native Web Speech API Component) ───────────────────
-    voice_col1, voice_col2 = st.columns([3, 1])
-    with voice_col1:
-        voice_spoken = voice_input_widget(key="outrage_voice_live")
-    with voice_col2:
-        if st.button("🗑️ Clear", use_container_width=True):
-            st.session_state.messages = st.session_state.messages[:1]
-            st.session_state.speak_text = ""
-            st.session_state.last_handled_voice = ""
-            st.rerun()
+    voice_spoken = voice_input_widget(key="outrage_voice_live")
 
-    # ── Chat Input Form (supports ENTER key and Send button) ───────────────────
+    # ── Chat Input Form (ENTER key + Send button) ──────────────────────────────
     prefill_val = st.session_state.pop("prefill", "")
     with st.form("chat_input_form", clear_on_submit=True):
         f_inp, f_btn = st.columns([7.8, 2.2])
@@ -560,13 +583,20 @@ with col_left:
             typed_input = st.text_input(
                 "chat_field",
                 value=prefill_val,
-                placeholder="Type your question and press Enter...",
+                placeholder="Type and press Enter, or use mic above...",
                 label_visibility="collapsed",
             )
         with f_btn:
             submit_clicked = st.form_submit_button("Send ➤", use_container_width=True)
 
-    # Query processing (handles native Voice speech, query params, and Typed input)
+    clear_col, _ = st.columns([1, 3])
+    if clear_col.button("🗑️ Clear chat", use_container_width=True):
+        st.session_state.messages = st.session_state.messages[:1]
+        st.session_state.speak_text = ""
+        st.session_state.last_handled_voice = ""
+        st.rerun()
+
+    # ── Query Resolver ─────────────────────────────────────────────────────────
     query_to_run = ""
     if (
         voice_spoken
@@ -579,29 +609,33 @@ with col_left:
         query_to_run = typed_input.strip()
 
     if query_to_run:
+        # Prepend selected ocean context if not already in the query
+        q_final = query_to_run
+        if sel_ocean != "All" and sel_ocean.lower() not in query_to_run.lower():
+            q_final = f"In the {sel_ocean}: {query_to_run}"
+
         curr_time = datetime.now().strftime("%H:%M")
         st.session_state.messages.append({"role": "user", "content": query_to_run, "time": curr_time})
 
-        intent = classify_intent(query_to_run)
-        q_reg = extract_region(query_to_run)
-        q_m = extract_month(query_to_run)
+        intent = classify_intent(q_final)
+        q_reg = sel_ocean  # Use user's selected ocean region
+        q_m = extract_month(q_final)
 
         with st.spinner("⚡ Outrage is thinking..."):
             if not st.session_state.groq_key:
                 sdf = surface[surface["region"] == q_reg] if q_reg != "All" else surface
                 bot_ans = (
-                    f"📊 **Data summary for {q_reg}:**\n\n"
-                    f"- Mean Sea Surface Temp: **{sdf['temperature_c'].mean():.2f}°C**\n"
-                    f"- Mean Surface Salinity: **{sdf['salinity_psu'].mean():.2f} PSU**\n"
-                    f"- Active Float Profiles: **{sdf['profile_id'].nunique():,}**\n\n"
-                    f"*Tip: Enter your Groq API key in the sidebar for complete LLaMA3 scientific synthesis!*"
+                    f"📊 **Data for {q_reg}:**\n\n"
+                    f"- Mean SST: **{sdf['temperature_c'].mean():.2f}°C**\n"
+                    f"- Mean Salinity: **{sdf['salinity_psu'].mean():.2f} PSU**\n"
+                    f"- Float Profiles: **{sdf['profile_id'].nunique():,}**\n\n"
+                    f"*Enter your Groq API key above for full AI-powered answers!*"
                 )
             else:
-                bot_ans = answer_query(query_to_run, st.session_state.groq_key)
+                bot_ans = answer_query(q_final, st.session_state.groq_key)
 
         st.session_state.messages.append({"role": "assistant", "content": bot_ans, "time": curr_time})
 
-        # Trigger voice speech synthesis if audio is enabled
         if st.session_state.audio_enabled:
             st.session_state.speak_text = bot_ans
 
@@ -612,11 +646,9 @@ with col_left:
         import re
         spk_raw = st.session_state.speak_text
         st.session_state.speak_text = ""
-        # Clean markdown characters for natural speech
         spk_clean = re.sub(r"[*#_`>\[\]]", "", spk_raw)
         spk_clean = re.sub(r"https?://\S+", "", spk_clean)
         spk_clean = spk_clean.replace("\\", "").replace('"', '\\"').replace("'", "\\'").replace("\n", " ").strip()
-
         tts_script = f"""
         <script>
         (function() {{
@@ -624,9 +656,7 @@ with col_left:
             if (win.speechSynthesis) {{
                 win.speechSynthesis.cancel();
                 var u = new SpeechSynthesisUtterance("{spk_clean[:380]}");
-                u.rate = 1.05;
-                u.pitch = 1.0;
-                u.lang = 'en-US';
+                u.rate = 1.05; u.pitch = 1.0; u.lang = 'en-US';
                 win.speechSynthesis.speak(u);
             }}
         }})();
@@ -697,7 +727,7 @@ with col_right:
         # Map display
         with st.spinner("Rendering satellite ocean tiles..."):
             map_fig = plot_satellite_ocean_map(
-                region="All",
+                region=st.session_state.get("selected_ocean", "All"),
                 month=0,
                 base_map=base_map_sel,
                 show_trajectories=show_trajectories,

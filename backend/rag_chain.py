@@ -157,7 +157,7 @@ Provide a clear, scientific answer based on the ARGO data above."""
     try:
         client = Groq(api_key=groq_api_key)
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -167,4 +167,4 @@ Provide a clear, scientific answer based on the ARGO data above."""
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"⚠️ LLM error: {str(e)}. Please check your Groq API key."
+        return f"Error getting AI response: {str(e)}"
