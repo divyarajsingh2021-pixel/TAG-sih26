@@ -21,9 +21,12 @@ import plotly.express as px
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-from streamlit_mic_recorder import speech_to_text
 
 load_dotenv()
+
+# ── Declare Native Voice Input Component ──────────────────────────────────────
+VOICE_DIR = Path(__file__).parent / "voice_component"
+voice_input_widget = components.declare_component("voice_input_widget", path=str(VOICE_DIR))
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -538,21 +541,15 @@ with col_left:
     chat_html += '</div>'
     st.markdown(chat_html, unsafe_allow_html=True)
 
-    # ── Voice Speech Input (Real-time Bidirectional Component) ─────────────────
+    # ── Voice Speech Input (Native Web Speech API Component) ───────────────────
     voice_col1, voice_col2 = st.columns([3, 1])
     with voice_col1:
-        voice_spoken = speech_to_text(
-            language="en",
-            start_prompt="🎤 Speak to Outrage",
-            stop_prompt="⏹️ Stop & Send Question",
-            just_once=True,
-            use_container_width=True,
-            key="outrage_voice_stt",
-        )
+        voice_spoken = voice_input_widget(key="outrage_voice_live")
     with voice_col2:
         if st.button("🗑️ Clear", use_container_width=True):
             st.session_state.messages = st.session_state.messages[:1]
             st.session_state.speak_text = ""
+            st.session_state.last_handled_voice = ""
             st.rerun()
 
     # ── Chat Input Form (supports ENTER key and Send button) ───────────────────
@@ -571,10 +568,13 @@ with col_left:
 
     # Query processing (handles native Voice speech, query params, and Typed input)
     query_to_run = ""
-    if voice_spoken and voice_spoken.strip():
-        query_to_run = voice_spoken.strip()
-    elif incoming_vquery:
-        query_to_run = incoming_vquery
+    if (
+        voice_spoken
+        and str(voice_spoken).strip()
+        and str(voice_spoken) != st.session_state.get("last_handled_voice", "")
+    ):
+        st.session_state.last_handled_voice = str(voice_spoken)
+        query_to_run = str(voice_spoken).strip()
     elif submit_clicked and typed_input.strip():
         query_to_run = typed_input.strip()
 

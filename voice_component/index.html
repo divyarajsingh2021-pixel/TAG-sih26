@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: transparent;
+      overflow: hidden;
+    }
+    .mic-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 0;
+    }
+    .mic-btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+    .mic-btn:hover {
+      background: #1d4ed8;
+      transform: scale(1.05);
+    }
+    .mic-btn.active {
+      background: #ef4444 !important;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0%   { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); }
+      100% { transform: scale(1.12); box-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
+    }
+    .mic-text {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .mic-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+    .mic-sub {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .transcript-box {
+      font-size: 12px;
+      color: #2563eb;
+      font-weight: 600;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 280px;
+    }
+  </style>
+</head>
+<body>
+  <div class="mic-wrap">
+    <button id="btn" class="mic-btn" onclick="toggleMic()" title="Click to speak (Chrome recommended)">
+      🎤
+    </button>
+    <div class="mic-text">
+      <span id="lbl" class="mic-label">Click mic to speak</span>
+      <span id="sub" class="mic-sub">Chrome Web Speech API • Real-Time</span>
+      <span id="trans" class="transcript-box"></span>
+    </div>
+  </div>
+
+  <script>
+    function sendMessageToStreamlit(type, data) {
+      const outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
+      window.parent.postMessage(outData, "*");
+    }
+
+    function init() {
+      sendMessageToStreamlit("streamlit:componentReady", { apiVersion: 1 });
+      sendMessageToStreamlit("streamlit:setFrameHeight", { height: 60 });
+    }
+
+    window.addEventListener("message", function(event) {
+      if (event.data.type === "streamlit:render") {
+        sendMessageToStreamlit("streamlit:setFrameHeight", { height: 60 });
+      }
+    });
+
+    init();
+
+    let recognition = null;
+    let listening = false;
+
+    function toggleMic() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        document.getElementById('lbl').innerText = "Please use Google Chrome";
+        return;
+      }
+
+      if (listening && recognition) {
+        recognition.stop();
+        return;
+      }
+
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+
+      recognition.onstart = function() {
+        listening = true;
+        document.getElementById('btn').classList.add('active');
+        document.getElementById('lbl').innerText = "🎙️ Listening... Speak now";
+        document.getElementById('trans').innerText = "";
+      };
+
+      recognition.onresult = function(event) {
+        let currentTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        document.getElementById('trans').innerText = '“' + currentTranscript + '”';
+
+        // Check if final transcript is ready
+        let finalStr = "";
+        for (let j = 0; j < event.results.length; ++j) {
+          if (event.results[j].isFinal) {
+            finalStr += event.results[j][0].transcript;
+          }
+        }
+
+        if (finalStr.trim().length > 0) {
+          document.getElementById('lbl').innerText = "✅ Sending to Outrage...";
+          document.getElementById('btn').classList.remove('active');
+          listening = false;
+
+          // Directly send value to Streamlit Python in real time!
+          sendMessageToStreamlit("streamlit:setComponentValue", { value: finalStr.trim() });
+        }
+      };
+
+      recognition.onerror = function(event) {
+        document.getElementById('lbl').innerText = "⚠️ " + event.error;
+        document.getElementById('btn').classList.remove('active');
+        listening = false;
+      };
+
+      recognition.onend = function() {
+        document.getElementById('btn').classList.remove('active');
+        listening = false;
+        if (document.getElementById('lbl').innerText.includes("Listening")) {
+          document.getElementById('lbl').innerText = "Click mic to speak";
+        }
+      };
+
+      recognition.start();
+    }
+  </script>
+</body>
+</html>
