@@ -21,6 +21,7 @@ import plotly.express as px
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+from streamlit_mic_recorder import speech_to_text
 
 load_dotenv()
 
@@ -537,8 +538,22 @@ with col_left:
     chat_html += '</div>'
     st.markdown(chat_html, unsafe_allow_html=True)
 
-    # ── Voice Mic Button (Web Speech Recognition) ─────────────────────────────
-    components.html(VOICE_HTML, height=48)
+    # ── Voice Speech Input (Real-time Bidirectional Component) ─────────────────
+    voice_col1, voice_col2 = st.columns([3, 1])
+    with voice_col1:
+        voice_spoken = speech_to_text(
+            language="en",
+            start_prompt="🎤 Speak to Outrage",
+            stop_prompt="⏹️ Stop & Send Question",
+            just_once=True,
+            use_container_width=True,
+            key="outrage_voice_stt",
+        )
+    with voice_col2:
+        if st.button("🗑️ Clear", use_container_width=True):
+            st.session_state.messages = st.session_state.messages[:1]
+            st.session_state.speak_text = ""
+            st.rerun()
 
     # ── Chat Input Form (supports ENTER key and Send button) ───────────────────
     prefill_val = st.session_state.pop("prefill", "")
@@ -554,14 +569,11 @@ with col_left:
         with f_btn:
             submit_clicked = st.form_submit_button("Send ➤", use_container_width=True)
 
-    # Clear chat option
-    if st.button("🗑️ Reset conversation", use_container_width=False):
-        st.session_state.messages = st.session_state.messages[:1]
-        st.rerun()
-
-    # Query processing (handles both Voice speech and Typed input)
+    # Query processing (handles native Voice speech, query params, and Typed input)
     query_to_run = ""
-    if incoming_vquery:
+    if voice_spoken and voice_spoken.strip():
+        query_to_run = voice_spoken.strip()
+    elif incoming_vquery:
         query_to_run = incoming_vquery
     elif submit_clicked and typed_input.strip():
         query_to_run = typed_input.strip()
@@ -608,13 +620,14 @@ with col_left:
         tts_script = f"""
         <script>
         (function() {{
-            if ('speechSynthesis' in window) {{
-                window.speechSynthesis.cancel();
+            const win = window.parent || window;
+            if (win.speechSynthesis) {{
+                win.speechSynthesis.cancel();
                 var u = new SpeechSynthesisUtterance("{spk_clean[:380]}");
-                u.rate = 1.0;
+                u.rate = 1.05;
                 u.pitch = 1.0;
                 u.lang = 'en-US';
-                window.speechSynthesis.speak(u);
+                win.speechSynthesis.speak(u);
             }}
         }})();
         </script>
