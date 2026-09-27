@@ -88,6 +88,21 @@ if "view_mode" not in st.session_state:
 if "prefill" not in st.session_state:
     st.session_state.prefill = ""
 
+if "audio_enabled" not in st.session_state:
+    st.session_state.audio_enabled = True
+
+if "speak_text" not in st.session_state:
+    st.session_state.speak_text = ""
+
+# Check for incoming voice recognition query from browser
+incoming_vquery = ""
+try:
+    if "vquery" in st.query_params:
+        incoming_vquery = st.query_params["vquery"]
+        st.query_params.clear()
+except Exception:
+    pass
+
 if "groq_key" not in st.session_state:
     try:
         st.session_state.groq_key = st.secrets["GROQ_API_KEY"]
@@ -381,14 +396,17 @@ st.markdown("""
 
 # ── Web Speech API JavaScript Component ───────────────────────────────────────
 VOICE_HTML = """
-<div style="display:flex;align-items:center;justify-content:center;height:100%;">
-  <button id="micBtn" onclick="toggleSpeech()" title="Click to speak (Chrome recommended)"
-    style="background:#f3f4f6; border:1px solid #d1d5db; border-radius:50%; width:40px; height:40px;
-           cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px;
-           transition:all 0.2s ease;">
+<div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+  <button id="micBtn" onclick="toggleSpeech()" title="Click and speak your question"
+    style="background:#2563eb; color:white; border:none; border-radius:50%; width:42px; height:42px;
+           cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:20px;
+           box-shadow:0 2px 8px rgba(37,99,235,0.35); transition:all 0.2s ease;">
     🎤
   </button>
-  <span id="speechStatus" style="font-size:11px; color:#6b7280; margin-left:6px;"></span>
+  <div style="display:flex; flex-direction:column;">
+    <span id="speechStatus" style="font-size:12px; font-weight:600; color:#374151;">Click mic to speak</span>
+    <span style="font-size:10px; color:#9ca3af;">Works with Chrome &amp; Edge</span>
+  </div>
 </div>
 <script>
 let recognizing = false;
@@ -397,7 +415,7 @@ let recognition = null;
 function toggleSpeech() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    document.getElementById('speechStatus').innerText = 'Use Chrome';
+    document.getElementById('speechStatus').innerText = 'Use Chrome/Edge for voice';
     return;
   }
   if (!recognition) {
@@ -408,19 +426,29 @@ function toggleSpeech() {
 
     recognition.onstart = function() {
       recognizing = true;
-      document.getElementById('micBtn').style.background = '#fee2e2';
-      document.getElementById('micBtn').style.borderColor = '#ef4444';
-      document.getElementById('speechStatus').innerText = 'Listening…';
+      document.getElementById('micBtn').style.background = '#ef4444';
+      document.getElementById('micBtn').style.boxShadow = '0 0 14px rgba(239,68,68,0.7)';
+      document.getElementById('speechStatus').innerText = '🎙️ Listening to you…';
     };
 
     recognition.onresult = function(event) {
       const transcript = event.results[0][0].transcript;
-      document.getElementById('speechStatus').innerText = 'Got: ' + transcript;
-      window.parent.postMessage({ type: 'voice_input', text: transcript }, '*');
+      document.getElementById('speechStatus').innerText = '✅ Transcribed: ' + transcript;
+      document.getElementById('micBtn').style.background = '#10b981';
+      recognizing = false;
+
+      // Automatically send speech transcript to Streamlit parent page!
+      try {
+        const pUrl = new URL(window.parent.location.href);
+        pUrl.searchParams.set('vquery', transcript);
+        window.parent.location.href = pUrl.href;
+      } catch(e) {
+        window.parent.postMessage({ type: 'voice_input', text: transcript }, '*');
+      }
     };
 
     recognition.onerror = function(event) {
-      document.getElementById('speechStatus').innerText = 'Error: ' + event.error;
+      document.getElementById('speechStatus').innerText = '⚠️ ' + event.error;
       resetMic();
     };
 
@@ -439,9 +467,8 @@ function toggleSpeech() {
 
 function resetMic() {
   recognizing = false;
-  document.getElementById('micBtn').style.background = '#f3f4f6';
-  document.getElementById('micBtn').style.borderColor = '#d1d5db';
-  setTimeout(() => { document.getElementById('speechStatus').innerText = ''; }, 2500);
+  document.getElementById('micBtn').style.background = '#2563eb';
+  document.getElementById('micBtn').style.boxShadow = '0 2px 8px rgba(37,99,235,0.35)';
 }
 </script>
 """
@@ -455,19 +482,22 @@ col_left, col_right = st.columns([3.8, 6.2], gap="small")
 # LEFT COLUMN — CHAT PANEL (Outrage Ocean AI)
 # ══════════════════════════════════════════════════════════════════════════════
 with col_left:
-    st.markdown("""
-    <div class="chat-header">
-      <div class="chat-avatar">⚡</div>
-      <div class="chat-title-box">
-        <div class="chat-name">Outrage</div>
-        <div class="chat-status">Online</div>
-      </div>
-      <div class="header-actions">
-        <span class="pill-action">🎤 Mic</span>
-        <span class="pill-audio">🔊 Audio</span>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    hdr_info, hdr_audio_btn = st.columns([3, 1.4])
+    with hdr_info:
+        st.markdown("""
+        <div style="display:flex; align-items:center; gap:12px; padding: 2px 0;">
+          <div class="chat-avatar">⚡</div>
+          <div class="chat-title-box">
+            <div class="chat-name">Outrage</div>
+            <div class="chat-status">Online</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with hdr_audio_btn:
+        audio_toggle_label = "🔊 Voice: ON" if st.session_state.audio_enabled else "🔇 Voice: OFF"
+        if st.button(audio_toggle_label, key="hdr_toggle_audio", use_container_width=True):
+            st.session_state.audio_enabled = not st.session_state.audio_enabled
+            st.rerun()
 
     # API key setup (in sleek expander)
     with st.expander("🔑 Groq API Key Config", expanded=not bool(st.session_state.groq_key)):
@@ -507,50 +537,42 @@ with col_left:
     chat_html += '</div>'
     st.markdown(chat_html, unsafe_allow_html=True)
 
-    # Input Row with mic & send
-    prefill_val = st.session_state.pop("prefill", "")
-    inp_col, mic_col, send_col = st.columns([7, 1.2, 1.8])
-    with inp_col:
-        user_query = st.text_input(
-            "query_box",
-            value=prefill_val,
-            placeholder="Type your message about ocean data...",
-            label_visibility="collapsed",
-            key="chat_input_field",
-        )
-    with mic_col:
-        components.html(VOICE_HTML, height=45)
-    with send_col:
-        send_pressed = st.button("Send ➤", use_container_width=True)
+    # ── Voice Mic Button (Web Speech Recognition) ─────────────────────────────
+    components.html(VOICE_HTML, height=48)
 
-    # Listen for speech recognition transcript via JS postMessage
-    components.html("""
-    <script>
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'voice_input') {
-        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-        if (inputs.length > 0) {
-          inputs[0].value = event.data.text;
-          inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }
-    });
-    </script>
-    """, height=0)
+    # ── Chat Input Form (supports ENTER key and Send button) ───────────────────
+    prefill_val = st.session_state.pop("prefill", "")
+    with st.form("chat_input_form", clear_on_submit=True):
+        f_inp, f_btn = st.columns([7.8, 2.2])
+        with f_inp:
+            typed_input = st.text_input(
+                "chat_field",
+                value=prefill_val,
+                placeholder="Type your question and press Enter...",
+                label_visibility="collapsed",
+            )
+        with f_btn:
+            submit_clicked = st.form_submit_button("Send ➤", use_container_width=True)
 
     # Clear chat option
     if st.button("🗑️ Reset conversation", use_container_width=False):
         st.session_state.messages = st.session_state.messages[:1]
         st.rerun()
 
-    # Query processing
-    if send_pressed and user_query.strip():
-        curr_time = datetime.now().strftime("%H:%M")
-        st.session_state.messages.append({"role": "user", "content": user_query, "time": curr_time})
+    # Query processing (handles both Voice speech and Typed input)
+    query_to_run = ""
+    if incoming_vquery:
+        query_to_run = incoming_vquery
+    elif submit_clicked and typed_input.strip():
+        query_to_run = typed_input.strip()
 
-        intent = classify_intent(user_query)
-        q_reg = extract_region(user_query)
-        q_m = extract_month(user_query)
+    if query_to_run:
+        curr_time = datetime.now().strftime("%H:%M")
+        st.session_state.messages.append({"role": "user", "content": query_to_run, "time": curr_time})
+
+        intent = classify_intent(query_to_run)
+        q_reg = extract_region(query_to_run)
+        q_m = extract_month(query_to_run)
 
         with st.spinner("⚡ Outrage is thinking..."):
             if not st.session_state.groq_key:
@@ -563,10 +585,41 @@ with col_left:
                     f"*Tip: Enter your Groq API key in the sidebar for complete LLaMA3 scientific synthesis!*"
                 )
             else:
-                bot_ans = answer_query(user_query, st.session_state.groq_key)
+                bot_ans = answer_query(query_to_run, st.session_state.groq_key)
 
         st.session_state.messages.append({"role": "assistant", "content": bot_ans, "time": curr_time})
+
+        # Trigger voice speech synthesis if audio is enabled
+        if st.session_state.audio_enabled:
+            st.session_state.speak_text = bot_ans
+
         st.rerun()
+
+    # ── Text-to-Speech (TTS Audio Playback) ───────────────────────────────────
+    if st.session_state.audio_enabled and st.session_state.speak_text:
+        import re
+        spk_raw = st.session_state.speak_text
+        st.session_state.speak_text = ""
+        # Clean markdown characters for natural speech
+        spk_clean = re.sub(r"[*#_`>\[\]]", "", spk_raw)
+        spk_clean = re.sub(r"https?://\S+", "", spk_clean)
+        spk_clean = spk_clean.replace("\\", "").replace('"', '\\"').replace("'", "\\'").replace("\n", " ").strip()
+
+        tts_script = f"""
+        <script>
+        (function() {{
+            if ('speechSynthesis' in window) {{
+                window.speechSynthesis.cancel();
+                var u = new SpeechSynthesisUtterance("{spk_clean[:380]}");
+                u.rate = 1.0;
+                u.pitch = 1.0;
+                u.lang = 'en-US';
+                window.speechSynthesis.speak(u);
+            }}
+        }})();
+        </script>
+        """
+        components.html(tts_script, height=0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
