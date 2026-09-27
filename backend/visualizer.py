@@ -317,3 +317,120 @@ def plot_globe(region: str = "All", month: int = 0) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
     )
     return fig
+
+
+# ── Satellite Ocean Map (Reference UI Image 2) ───────────────────────────────
+
+def plot_satellite_ocean_map(
+    region: str = "All",
+    month: int = 0,
+    base_map: str = "Satellite (ESRI)",
+    show_trajectories: bool = False,
+    show_heatmap: bool = False,
+) -> go.Figure:
+    """
+    Interactive Satellite Ocean Map matching the exact reference UI.
+    Renders high-resolution satellite/bathymetry imagery (ESRI) with ARGO float
+    markers (yellow dots with border), optional drift trajectories, and SST heatmap.
+    """
+    df = filter_data(region=region, month=month)
+    surface = df[df["depth_m"] == 0].copy() if not df.empty else df
+
+    if surface.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="No data available", x=0.5, y=0.5, showarrow=False)
+        return fig
+
+    fig = go.Figure()
+
+    # Temperature anomaly / density heatmap layer
+    if show_heatmap:
+        fig.add_trace(go.Densitymapbox(
+            lat=surface["latitude"],
+            lon=surface["longitude"],
+            z=surface["temperature_c"],
+            radius=30,
+            colorscale="Thermal",
+            opacity=0.55,
+            name="SST Heatmap",
+            showscale=False,
+        ))
+
+    # Float drift trajectories (connect profiles of each float over time)
+    if show_trajectories:
+        for fid, grp in surface.groupby("float_id"):
+            if len(grp) > 1:
+                grp = grp.sort_values("date")
+                fig.add_trace(go.Scattermapbox(
+                    lat=grp["latitude"],
+                    lon=grp["longitude"],
+                    mode="lines",
+                    line=dict(width=2, color="rgba(56, 189, 248, 0.75)"),
+                    hoverinfo="none",
+                    showlegend=False,
+                ))
+
+    # Float markers (yellow dots with white halo, as in reference)
+    sample = surface.groupby("float_id").last().reset_index()
+
+    hover_texts = [
+        f"<b>Float:</b> {row.float_id}<br>"
+        f"<b>Region:</b> {row.region}<br>"
+        f"<b>SST:</b> {row.temperature_c:.1f}°C<br>"
+        f"<b>Salinity:</b> {row.salinity_psu:.2f} PSU<br>"
+        f"<b>Coordinates:</b> {row.latitude:.2f}°N, {row.longitude:.2f}°E<br>"
+        f"<b>Last Profile:</b> {str(row.date)[:10]}"
+        for row in sample.itertuples()
+    ]
+
+    fig.add_trace(go.Scattermapbox(
+        lat=sample["latitude"],
+        lon=sample["longitude"],
+        mode="markers",
+        marker=dict(
+            size=11,
+            color="#f59e0b",
+            opacity=0.95,
+        ),
+        text=hover_texts,
+        hoverinfo="text",
+        name="ARGO Floats",
+    ))
+
+    # Mapbox configuration with tile raster layers
+    mapbox_config = dict(
+        center=dict(lat=6.0, lon=75.0),
+        zoom=2.8,
+    )
+
+    if base_map == "Satellite (ESRI)":
+        mapbox_config["style"] = "white-bg"
+        mapbox_config["layers"] = [{
+            "below": "traces",
+            "sourcetype": "raster",
+            "source": [
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            ]
+        }]
+    elif base_map == "Ocean Bathymetry":
+        mapbox_config["style"] = "white-bg"
+        mapbox_config["layers"] = [{
+            "below": "traces",
+            "sourcetype": "raster",
+            "source": [
+                "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+            ]
+        }]
+    elif base_map == "Dark Matter":
+        mapbox_config["style"] = "carto-darkmatter"
+    else:
+        mapbox_config["style"] = "open-street-map"
+
+    fig.update_layout(
+        mapbox=mapbox_config,
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=720,
+        showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig

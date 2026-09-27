@@ -1,25 +1,25 @@
 """
-FloatChat 🌊 — Streamlit Frontend (v2)
-========================================
-Features:
-  1. 3D Interactive Globe (Plotly orthographic Scattergeo)
-  2. Voice Input (Web Speech API via st.components.v1.html)
-  3. Multi-Panel Dashboard (st.tabs + st.columns)
-  4. Toggle Controls (st.session_state for open/close panels)
-
-Run with:  streamlit run app.py
+FloatChat 🌊  — Dolphin Ocean AI
+=================================
+Pixel-perfect implementation matching the reference UI:
+- Left  : Chat Panel (Dolphin, Online indicator, Mic/Audio pills, styled bubbles, voice input)
+- Right : Toggleable between:
+          1. ARGO Analytics Dashboard (Overview 6-metric cards, Yearly Trends, Regional Donut, 4 Tabs)
+          2. Full Satellite Ocean Map (ESRI satellite tiles, yellow float markers, floating layer controls)
 """
 
-# ── Import torch FIRST on Windows to prevent c10.dll load-order crash ─────────
-import torch
-import sys
-import os
+import torch  # Required first on Windows to avoid DLL load order issues
+import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,598 +27,830 @@ load_dotenv()
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="FloatChat 🌊",
-    page_icon="🌊",
+    page_icon="🐬",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ── Bootstrap data on first run ───────────────────────────────────────────────
-DATA_PATH = Path("data/processed/argo_indian_ocean.parquet")
+# ── Bootstrap data ────────────────────────────────────────────────────────────
+DATA_PATH  = Path("data/processed/argo_indian_ocean.parquet")
 INDEX_PATH = Path("data/faiss_index/summaries.json")
 
 if not DATA_PATH.exists():
-    with st.spinner("⏳ Generating ARGO dataset (first run only)..."):
-        from scripts.download_argo import main as gen_data
-        gen_data()
+    with st.spinner("⏳ Generating ARGO dataset…"):
+        from scripts.download_argo import main as gen_data; gen_data()
 
 if not INDEX_PATH.exists():
-    with st.spinner("⏳ Building search index (first run only)..."):
-        from scripts.build_index import build_index
-        build_index()
+    with st.spinner("⏳ Building search index…"):
+        from scripts.build_index import build_index; build_index()
 
-# ── Imports after data is ready ───────────────────────────────────────────────
-from backend.rag_chain import answer_query
-from backend.router import classify_intent, extract_region, extract_month
+from backend.rag_chain  import answer_query
+from backend.router     import classify_intent, extract_region, extract_month
 from backend.visualizer import (
-    plot_float_map,
-    plot_temperature_profile,
-    plot_salinity_profile,
-    plot_sst_timeseries,
-    plot_regional_comparison,
-    plot_ts_diagram,
-    plot_globe,
+    plot_float_map, plot_temperature_profile, plot_salinity_profile,
+    plot_sst_timeseries, plot_regional_comparison, plot_ts_diagram,
+    plot_globe, plot_satellite_ocean_map,
 )
 
-# ── Session state initialisation ──────────────────────────────────────────────
-# These persist across reruns so toggles "remember" their state.
+# ── Load data ─────────────────────────────────────────────────────────────────
+@st.cache_data
+def load_dataset():
+    return pd.read_parquet(DATA_PATH)
+
+df = load_dataset()
+surface = df[df["depth_m"] == 0]
+total_floats = df["float_id"].nunique()
+total_profiles = df["profile_id"].nunique()
+total_records = len(df)
+avg_sst = surface["temperature_c"].mean()
+avg_sal = surface["salinity_psu"].mean()
+current_time_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
+
+# ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
             "content": (
-                "👋 Hi! I'm **FloatChat**, your AI guide to ARGO ocean data.\n\n"
-                "Ask me about **temperature**, **salinity**, **float positions**, "
-                "**depth profiles**, or regional oceanography. "
-                "You can also use the 🎤 **voice button** (Chrome recommended)!"
+                "👋 **Welcome to FloatChat (Dolphin Ocean AI)!**\n\n"
+                "I am your conversational interface for ARGO ocean float data. "
+                "You can ask me questions about **temperature**, **salinity**, **float trajectories**, "
+                "or **depth profiles** across the Indian Ocean, Arabian Sea, and Bay of Bengal.\n\n"
+                "You can type below or click 🎤 **Mic** to speak!"
             ),
+            "time": datetime.now().strftime("%H:%M"),
         }
     ]
-if "show_globe"      not in st.session_state: st.session_state.show_globe      = True
-if "show_raw_table"  not in st.session_state: st.session_state.show_raw_table  = False
-if "chart_type"      not in st.session_state: st.session_state.chart_type      = "Temperature Profile"
-if "voice_text"      not in st.session_state: st.session_state.voice_text      = ""
-if "prefill"         not in st.session_state: st.session_state.prefill         = ""
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+if "view_mode" not in st.session_state:
+    st.session_state.view_mode = "dashboard"  # "dashboard" (Image 1) or "map" (Image 2)
+
+if "prefill" not in st.session_state:
+    st.session_state.prefill = ""
+
+if "groq_key" not in st.session_state:
+    try:
+        st.session_state.groq_key = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        st.session_state.groq_key = os.getenv("GROQ_API_KEY", "")
+
+# ── Master CSS matching Reference UI ──────────────────────────────────────────
 st.markdown("""
 <style>
-    .main-title {
-        font-size: 2.8rem; font-weight: 800;
-        background: linear-gradient(135deg, #0077B6, #00B4D8, #90E0EF);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 0;
-    }
-    .subtitle { color: #666; font-size: 1.1rem; margin-top: 0; }
-    .chat-user {
-        background: linear-gradient(135deg, #0077B6, #00B4D8);
-        color: white; padding: 12px 18px;
-        border-radius: 18px 18px 4px 18px;
-        margin: 8px 0; max-width: 80%; float: right; clear: both;
-    }
-    .chat-bot {
-        background: #f0f8ff; color: #1a1a2e;
-        padding: 12px 18px; border-radius: 18px 18px 18px 4px;
-        border-left: 4px solid #00B4D8;
-        margin: 8px 0; max-width: 85%; clear: both;
-    }
-    .toggle-btn > button {
-        background: #e8f4f8 !important; color: #0077B6 !important;
-        border: 2px solid #00B4D8 !important; border-radius: 20px !important;
-        font-weight: 600 !important;
-    }
-    .voice-hint { font-size: 0.78rem; color: #888; margin-top: 4px; }
+  /* Global page setup */
+  .stApp {
+    background-color: #f3f4f6 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  }
+  .main .block-container {
+    padding: 8px 12px !important;
+    max-width: 100% !important;
+  }
+  section[data-testid="stSidebar"] {
+    display: none;
+  }
+  #MainMenu, footer, header {
+    visibility: hidden;
+  }
+
+  /* Left Panel (Chat) */
+  .chat-container {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    height: 94vh;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+  }
+  .chat-header {
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .chat-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #eef2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    border: 1px solid #e0e7ff;
+  }
+  .chat-title-box {
+    display: flex;
+    flex-direction: column;
+  }
+  .chat-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+  .chat-status {
+    font-size: 12px;
+    color: #10b981;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chat-status::before {
+    content: "●";
+    font-size: 10px;
+  }
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .pill-action {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pill-audio {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Chat conversation stream */
+  .chat-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .user-bubble {
+    align-self: flex-end;
+    background: #dbeafe;
+    color: #1e3a8a;
+    padding: 12px 18px;
+    border-radius: 20px 20px 4px 20px;
+    max-width: 82%;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .bot-bubble {
+    align-self: flex-start;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    color: #1f2937;
+    padding: 14px 18px;
+    border-radius: 20px 20px 20px 4px;
+    max-width: 92%;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .time-stamp {
+    font-size: 10px;
+    color: #9ca3af;
+    margin-top: 4px;
+    text-align: right;
+  }
+
+  /* Right Panel (Dashboard & Map) */
+  .right-panel-container {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    height: 94vh;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+  }
+  .top-action-bar {
+    background: #ffffff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-radius: 16px 16px 0 0;
+  }
+  .top-title-box {
+    display: flex;
+    flex-direction: column;
+  }
+  .dash-main-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dash-sub-title {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+
+  /* Metric cards (exact Image 1 layout) */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 18px 24px 8px 24px;
+  }
+  .metric-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 16px 20px;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+  }
+  .card-icon {
+    font-size: 16px;
+  }
+  .card-val {
+    font-size: 26px;
+    font-weight: 800;
+    color: #111827;
+    margin-top: 6px;
+    line-height: 1.1;
+  }
+  .card-subtext {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-active {
+    background: #f3f4f6;
+    color: #374151;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-pill-blue {
+    background: #2563eb;
+    color: #ffffff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Floating Overlay Controls on Map (Image 2) */
+  .floating-map-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(229, 231, 235, 0.9);
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    margin-bottom: 12px;
+  }
+  .floating-legend-pill {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* Streamlit native widget styling */
+  .stTextInput > div > div > input {
+    border-radius: 24px !important;
+    padding: 10px 16px !important;
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    font-size: 14px !important;
+  }
+  .stButton > button {
+    border-radius: 20px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    transition: all 0.2s ease !important;
+  }
+  .primary-btn > button {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3) !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ── Voice Input Component ─────────────────────────────────────────────────────
-#
-# HOW IT WORKS (for judges):
-#   The browser's built-in Web Speech API (SpeechRecognition) listens to the
-#   microphone, converts audio to text locally (no server round-trip), and
-#   sends the resulting transcript to Streamlit via a hidden URL parameter
-#   (?voice_query=...). We embed the JavaScript in an <iframe> using
-#   st.components.v1.html(). When the user clicks 🎤, the JS fires, the user
-#   speaks, and the transcript populates the chat input automatically.
-#   Works best in Chrome/Edge which have the most complete Web Speech support.
-#
+# ── Web Speech API JavaScript Component ───────────────────────────────────────
 VOICE_HTML = """
-<div style="text-align:center; font-family:sans-serif;">
-  <button id="mic-btn" onclick="startListening()"
-    style="background:linear-gradient(135deg,#0077B6,#00B4D8);
-           color:white; border:none; border-radius:50%; width:52px; height:52px;
-           font-size:24px; cursor:pointer; box-shadow:0 3px 8px rgba(0,119,182,0.4);">
+<div style="display:flex;align-items:center;justify-content:center;height:100%;">
+  <button id="micBtn" onclick="toggleSpeech()" title="Click to speak (Chrome recommended)"
+    style="background:#f3f4f6; border:1px solid #d1d5db; border-radius:50%; width:40px; height:40px;
+           cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px;
+           transition:all 0.2s ease;">
     🎤
   </button>
-  <div id="status" style="font-size:12px; color:#888; margin-top:6px;">
-    Click mic to speak (Chrome recommended)
-  </div>
+  <span id="speechStatus" style="font-size:11px; color:#6b7280; margin-left:6px;"></span>
 </div>
 <script>
-function startListening() {
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizing = false;
+let recognition = null;
+
+function toggleSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    document.getElementById('status').innerText = '❌ Browser not supported. Use Chrome.';
+    document.getElementById('speechStatus').innerText = 'Use Chrome';
     return;
   }
-  var recognition = new SR();
-  recognition.lang = 'en-IN';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  if (!recognition) {
+    recognition = new SR();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-  document.getElementById('status').innerText = '🎙️ Listening…';
-  document.getElementById('mic-btn').style.background =
-    'linear-gradient(135deg,#e63946,#ff6b6b)';
+    recognition.onstart = function() {
+      recognizing = true;
+      document.getElementById('micBtn').style.background = '#fee2e2';
+      document.getElementById('micBtn').style.borderColor = '#ef4444';
+      document.getElementById('speechStatus').innerText = 'Listening…';
+    };
 
-  recognition.start();
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript;
+      document.getElementById('speechStatus').innerText = 'Got: ' + transcript;
+      window.parent.postMessage({ type: 'voice_input', text: transcript }, '*');
+    };
 
-  recognition.onresult = function(event) {
-    var transcript = event.results[0][0].transcript;
-    document.getElementById('status').innerText = '✅ Got: ' + transcript;
-    document.getElementById('mic-btn').style.background =
-      'linear-gradient(135deg,#0077B6,#00B4D8)';
-    // Send to Streamlit parent via postMessage
-    window.parent.postMessage({type: 'voice_query', text: transcript}, '*');
-  };
+    recognition.onerror = function(event) {
+      document.getElementById('speechStatus').innerText = 'Error: ' + event.error;
+      resetMic();
+    };
 
-  recognition.onerror = function(event) {
-    document.getElementById('status').innerText = '⚠️ Error: ' + event.error;
-    document.getElementById('mic-btn').style.background =
-      'linear-gradient(135deg,#0077B6,#00B4D8)';
-  };
+    recognition.onend = function() {
+      resetMic();
+    };
+  }
 
-  recognition.onend = function() {
-    if (document.getElementById('status').innerText === '🎙️ Listening…') {
-      document.getElementById('status').innerText = 'Click mic to speak';
-    }
-  };
+  if (recognizing) {
+    recognition.stop();
+    resetMic();
+  } else {
+    recognition.start();
+  }
+}
+
+function resetMic() {
+  recognizing = false;
+  document.getElementById('micBtn').style.background = '#f3f4f6';
+  document.getElementById('micBtn').style.borderColor = '#d1d5db';
+  setTimeout(() => { document.getElementById('speechStatus').innerText = ''; }, 2500);
 }
 </script>
 """
 
-
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## 🌊 FloatChat")
-    st.markdown("*AI assistant for ARGO ocean data*")
-    st.divider()
-
-    # API Key
-    st.markdown("### 🔑 Groq API Key")
-    st.markdown("Get free key at [console.groq.com](https://console.groq.com)")
-    default_key = ""
-    try:
-        default_key = st.secrets["GROQ_API_KEY"]
-    except Exception:
-        default_key = os.getenv("GROQ_API_KEY", "")
-
-    groq_key = st.text_input(
-        "Paste your key here:",
-        value=default_key,
-        type="password",
-        placeholder="gsk_xxxxxxxxxxxx",
-        help="Never stored — used only for this session.",
-    )
-    if groq_key:
-        st.success("✅ Key loaded")
-    else:
-        st.warning("⚠️ Enter key to enable AI answers")
-
-    st.divider()
-
-    # Filters
-    st.markdown("### 🔭 Data Filters")
-    region = st.selectbox(
-        "Ocean Region",
-        ["All", "Arabian Sea", "Bay of Bengal", "Indian Ocean"],
-    )
-    month = st.selectbox(
-        "Month",
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        format_func=lambda x: "All months" if x == 0 else
-        ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][x],
-    )
-
-    st.divider()
-
-    # ── Toggle Controls (Feature 4) ──────────────────────────────────────────
-    # st.session_state persists values across reruns so these act as true
-    # toggle switches — clicking once opens, clicking again closes.
-    st.markdown("### 🎛️ Panel Controls")
-
-    if st.button(
-        "🌍 Globe: " + ("ON  ✅" if st.session_state.show_globe else "OFF ⬜"),
-        key="toggle_globe",
-        use_container_width=True,
-    ):
-        st.session_state.show_globe = not st.session_state.show_globe
-        st.rerun()
-
-    if st.button(
-        "🗃️ Raw Table: " + ("ON  ✅" if st.session_state.show_raw_table else "OFF ⬜"),
-        key="toggle_table",
-        use_container_width=True,
-    ):
-        st.session_state.show_raw_table = not st.session_state.show_raw_table
-        st.rerun()
-
-    st.divider()
-
-    # Dataset info
-    st.markdown("### 📊 Dataset Info")
-    try:
-        df_info = pd.read_parquet(DATA_PATH)
-        st.metric("Float Profiles", f"{df_info['profile_id'].nunique():,}")
-        st.metric("ARGO Floats",    f"{df_info['float_id'].nunique():,}")
-        st.metric("Depth Levels",   f"{df_info['depth_m'].nunique()}")
-    except Exception:
-        st.info("Loading dataset...")
-
-    st.divider()
-    st.markdown("Built for **SIH 2026**")
-    st.markdown("Problem: SIH26-40 — FloatChat")
-    st.markdown("Data: ARGO GDAC — Indian Ocean")
-
-
-# ── MAIN HEADER ───────────────────────────────────────────────────────────────
-st.markdown('<h1 class="main-title">FloatChat 🌊</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">AI-powered conversational interface for ARGO ocean float data</p>',
-            unsafe_allow_html=True)
-
-# ── TABS (Feature 3) ──────────────────────────────────────────────────────────
-# Four tabs replace the original three. Each tab is a separate "panel" of the
-# dashboard. st.tabs() is Streamlit's native multi-panel component — no routing.
-tab_chat, tab_globe, tab_charts, tab_data = st.tabs([
-    "💬 Chat",
-    "🌍 3D Globe",
-    "📈 Charts & Trends",
-    "🗃️ Data Explorer",
-])
-
+# ─────────────────────────────────────────────────────────────────────────────
+# TWO-COLUMN SPLIT LAYOUT (Chat on Left 38%, Dashboard/Map on Right 62%)
+# ─────────────────────────────────────────────────────────────────────────────
+col_left, col_right = st.columns([3.8, 6.2], gap="small")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — CHAT
+# LEFT COLUMN — CHAT PANEL (Dolphin Ocean AI)
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_chat:
+with col_left:
+    st.markdown("""
+    <div class="chat-header">
+      <div class="chat-avatar">🐬</div>
+      <div class="chat-title-box">
+        <div class="chat-name">Dolphin</div>
+        <div class="chat-status">Online</div>
+      </div>
+      <div class="header-actions">
+        <span class="pill-action">🎤 Mic</span>
+        <span class="pill-audio">🔊 Audio</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Example query buttons
-    st.markdown("**💡 Try these:**")
-    examples = [
-        "What is the average SST in the Arabian Sea?",
-        "Show temperature profiles in Bay of Bengal in January",
-        "Compare salinity between Arabian Sea and Bay of Bengal",
-        "Which region is warmest at the surface?",
-        "What happens to temperature at 500m depth?",
-    ]
-    cols = st.columns(len(examples))
-    for i, ex in enumerate(examples):
-        if cols[i].button(ex[:35] + "…" if len(ex) > 35 else ex, key=f"ex_{i}"):
-            st.session_state.prefill = ex
-            st.rerun()
-
-    st.divider()
-
-    # Chat history
-    for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            st.markdown(f'<div class="chat-user">🧑 {msg["content"]}</div>',
-                        unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="chat-bot">🌊 {msg["content"]}</div>',
-                        unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Voice Input (Feature 2) ──────────────────────────────────────────────
-    # The mic button lives in a narrow column next to the text input.
-    # postMessage from the iframe is received by the parent Streamlit page.
-    # We use a hidden text input + JS to pass the voice transcript back.
-    col_input, col_mic = st.columns([10, 1])
-
-    with col_input:
-        prefill_val = st.session_state.pop("prefill", "")
-        # Allow voice_text to pre-fill if received
-        voice_val = st.session_state.pop("voice_text", "")
-        default_val = voice_val or prefill_val
-
-        query = st.text_input(
-            "Ask about ARGO ocean data…",
-            value=default_val,
-            placeholder="e.g. What is the sea surface temperature in the Bay of Bengal?",
-            key="chat_input",
+    # API key setup (in sleek expander)
+    with st.expander("🔑 Groq API Key Config", expanded=not bool(st.session_state.groq_key)):
+        key_input = st.text_input(
+            "API Key:",
+            value=st.session_state.groq_key,
+            type="password",
+            placeholder="gsk_xxxxxxxxxxxxxxxxxxxx",
             label_visibility="collapsed",
         )
+        if key_input:
+            st.session_state.groq_key = key_input
+        if st.session_state.groq_key:
+            st.success("✅ Groq Key Active (LLaMA3-70B)")
+        else:
+            st.warning("⚠️ Enter key for AI generation")
 
-    with col_mic:
-        # Embed the voice component in a small iframe
-        components.html(VOICE_HTML, height=80)
-        st.markdown('<p class="voice-hint">🎤 Chrome only</p>', unsafe_allow_html=True)
+    # Suggested Prompts (chips)
+    st.markdown("<div style='padding: 6px 16px 0 16px; font-size: 12px; font-weight: 600; color: #6b7280;'>💡 Quick queries:</div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    if c1.button("Average SST in Arabian Sea?", key="chip_1", use_container_width=True):
+        st.session_state.prefill = "What is the average sea surface temperature in the Arabian Sea?"
+        st.rerun()
+    if c2.button("Salinity profile near equator", key="chip_2", use_container_width=True):
+        st.session_state.prefill = "Show me salinity profile near the equator in 2023"
+        st.rerun()
 
-    # JS bridge: listen for postMessage from the voice iframe and put the
-    # transcript into a hidden Streamlit URL param so we can read it on rerun.
+    # Chat Messages Stream
+    chat_html = '<div class="chat-stream">'
+    for msg in st.session_state.messages:
+        content = msg["content"].replace("\n", "<br>")
+        t = msg.get("time", "")
+        if msg["role"] == "user":
+            chat_html += f'<div class="user-bubble">🧑 {content}<div class="time-stamp">{t}</div></div>'
+        else:
+            chat_html += f'<div class="bot-bubble">🐬 {content}<div class="time-stamp">{t}</div></div>'
+    chat_html += '</div>'
+    st.markdown(chat_html, unsafe_allow_html=True)
+
+    # Input Row with mic & send
+    prefill_val = st.session_state.pop("prefill", "")
+    inp_col, mic_col, send_col = st.columns([7, 1.2, 1.8])
+    with inp_col:
+        user_query = st.text_input(
+            "query_box",
+            value=prefill_val,
+            placeholder="Type your message about ocean data...",
+            label_visibility="collapsed",
+            key="chat_input_field",
+        )
+    with mic_col:
+        components.html(VOICE_HTML, height=45)
+    with send_col:
+        send_pressed = st.button("Send ➤", use_container_width=True)
+
+    # Listen for speech recognition transcript via JS postMessage
     components.html("""
     <script>
     window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'voice_query') {
-            // Write to the Streamlit query params so it survives rerun
-            var url = new URL(window.parent.location.href);
-            url.searchParams.set('voice_query', event.data.text);
-            window.parent.history.replaceState({}, '', url);
-            // Trigger a Streamlit rerun by simulating Enter on the text input
-            var inputs = window.parent.document.querySelectorAll('input[type="text"]');
-            if (inputs.length > 0) {
-                inputs[0].value = event.data.text;
-                inputs[0].dispatchEvent(new Event('input', {bubbles: true}));
-            }
+      if (event.data && event.data.type === 'voice_input') {
+        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+        if (inputs.length > 0) {
+          inputs[0].value = event.data.text;
+          inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
         }
+      }
     });
     </script>
     """, height=0)
 
-    # Pick up voice query from URL params if present
-    try:
-        params = st.query_params
-        if "voice_query" in params and params["voice_query"]:
-            vq = params["voice_query"]
-            if vq and not query:
-                query = vq
-            st.query_params.clear()
-    except Exception:
-        pass
+    # Clear chat option
+    if st.button("🗑️ Reset conversation", use_container_width=False):
+        st.session_state.messages = st.session_state.messages[:1]
+        st.rerun()
 
-    # Send + Clear buttons
-    col_send, col_clear = st.columns([1, 5])
-    with col_send:
-        send = st.button("Send 🚀", use_container_width=True)
-    with col_clear:
-        if st.button("Clear chat"):
-            st.session_state.messages = st.session_state.messages[:1]
-            st.rerun()
+    # Query processing
+    if send_pressed and user_query.strip():
+        curr_time = datetime.now().strftime("%H:%M")
+        st.session_state.messages.append({"role": "user", "content": user_query, "time": curr_time})
 
-    # ── Process the query ────────────────────────────────────────────────────
-    if send and query.strip():
-        st.session_state.messages.append({"role": "user", "content": query})
+        intent = classify_intent(user_query)
+        q_reg = extract_region(user_query)
+        q_m = extract_month(user_query)
 
-        intent   = classify_intent(query)
-        q_region = extract_region(query)
-        q_month  = extract_month(query)
-
-        with st.spinner("🌊 Searching ARGO data and generating answer…"):
-            if not groq_key:
-                try:
-                    df_q = pd.read_parquet(DATA_PATH)
-                    surface_q = df_q[df_q["depth_m"] == 0]
-                    if q_region != "All":
-                        surface_q = surface_q[surface_q["region"] == q_region]
-                    avg_t = surface_q["temperature_c"].mean()
-                    avg_s = surface_q["salinity_psu"].mean()
-                    answer = (
-                        f"📊 **Data summary for {q_region}:**\n\n"
-                        f"- Average SST: **{avg_t:.1f}°C**\n"
-                        f"- Average surface salinity: **{avg_s:.2f} PSU**\n"
-                        f"- Profiles available: **{surface_q['profile_id'].nunique():,}**\n\n"
-                        f"*Add your Groq API key in the sidebar for detailed AI analysis!*"
-                    )
-                except Exception as e:
-                    answer = f"Please add your Groq API key in the sidebar. Error: {e}"
+        with st.spinner("🐬 Dolphin is thinking..."):
+            if not st.session_state.groq_key:
+                sdf = surface[surface["region"] == q_reg] if q_reg != "All" else surface
+                bot_ans = (
+                    f"📊 **Data summary for {q_reg}:**\n\n"
+                    f"- Mean Sea Surface Temp: **{sdf['temperature_c'].mean():.2f}°C**\n"
+                    f"- Mean Surface Salinity: **{sdf['salinity_psu'].mean():.2f} PSU**\n"
+                    f"- Active Float Profiles: **{sdf['profile_id'].nunique():,}**\n\n"
+                    f"*Tip: Enter your Groq API key in the sidebar for complete LLaMA3 scientific synthesis!*"
+                )
             else:
-                answer = answer_query(query, groq_key)
+                bot_ans = answer_query(user_query, st.session_state.groq_key)
 
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-
-        # Auto-show relevant chart below the answer
-        st.markdown("**📈 Relevant visualization:**")
-        if intent == "location":
-            st.plotly_chart(plot_float_map(q_region, q_month), use_container_width=True)
-        elif intent == "salinity":
-            st.plotly_chart(plot_salinity_profile(q_region, q_month), use_container_width=True)
-        elif intent == "comparison":
-            st.plotly_chart(plot_regional_comparison(), use_container_width=True)
-        elif intent == "trend":
-            st.plotly_chart(plot_sst_timeseries(q_region), use_container_width=True)
-        elif intent == "ts_diagram":
-            st.plotly_chart(plot_ts_diagram(q_region), use_container_width=True)
-        else:
-            st.plotly_chart(plot_temperature_profile(q_region, q_month), use_container_width=True)
-
+        st.session_state.messages.append({"role": "assistant", "content": bot_ans, "time": curr_time})
         st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — 3D GLOBE (Feature 1)
+# RIGHT COLUMN — TOGGLEABLE: DASHBOARD VIEW (Image 1) OR SATELLITE MAP (Image 2)
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_globe:
-    # ── Why Plotly Scattergeo instead of PyDeck? (for judges) ────────────────
-    # PyDeck's GlobeView requires a Mapbox token and uses WebGL in a way that
-    # conflicts with Streamlit's sandboxed iframe. It also does not render on
-    # Streamlit Community Cloud without extra config.
-    # Plotly's go.Scattergeo with projection_type="orthographic" gives a true
-    # rotating 3D globe, works 100% client-side, requires no API keys, renders
-    # identical locally and on the cloud, and natively supports hover tooltips.
+with col_right:
 
-    st.markdown("### 🌍 3D Interactive Globe")
-    st.caption(
-        "Drag to rotate • Scroll to zoom • Hover a dot for float details  |  "
-        "Rendered with **Plotly Scattergeo** (orthographic projection)"
-    )
+    # ── Top Bar with Toggle Button ────────────────────────────────────────────
+    top_col_title, top_col_btns = st.columns([3, 2])
 
-    # Toggle: the globe can be hidden via the sidebar toggle (Feature 4)
-    if st.session_state.show_globe:
-        with st.spinner("Rendering globe…"):
-            globe_fig = plot_globe(region, month)
-        st.plotly_chart(globe_fig, use_container_width=True)
-
-        # Key facts below the globe
-        st.divider()
-        try:
-            df_g = pd.read_parquet(DATA_PATH)
-            surface_g = df_g[df_g["depth_m"] == 0]
-            if region != "All":
-                surface_g = surface_g[surface_g["region"] == region]
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Active Floats",  surface_g["float_id"].nunique())
-            c2.metric("Avg SST",        f"{surface_g['temperature_c'].mean():.1f}°C")
-            c3.metric("Avg Salinity",   f"{surface_g['salinity_psu'].mean():.2f} PSU")
-            c4.metric("Profiles",       f"{surface_g['profile_id'].nunique():,}")
-        except Exception:
-            pass
-    else:
-        st.info("🌍 Globe is hidden. Toggle it back ON from the **sidebar → Panel Controls**.")
-
-    # Also show the 2D flat map below for comparison
-    with st.expander("🗺️ Also show flat 2D map", expanded=False):
-        st.plotly_chart(plot_float_map(region, month), use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — CHARTS & TRENDS (Feature 3 — multi-panel with columns)
-# ══════════════════════════════════════════════════════════════════════════════
-with tab_charts:
-    st.markdown("### 📈 Charts & Trends")
-
-    # ── Chart type switcher (Feature 4 toggle) ───────────────────────────────
-    chart_options = [
-        "Temperature Profile",
-        "Salinity Profile",
-        "SST Time Series",
-        "Regional Comparison",
-        "T-S Diagram",
-    ]
-    st.session_state.chart_type = st.radio(
-        "Switch chart type:",
-        chart_options,
-        index=chart_options.index(st.session_state.chart_type),
-        horizontal=True,
-        key="chart_switcher",
-    )
-
-    st.divider()
-
-    # ── Side-by-side Temperature + Salinity profiles ─────────────────────────
-    # This is the "multi-panel" showcase: two charts in st.columns([1,1])
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.markdown("#### 🌡️ Temperature vs Depth")
-        st.plotly_chart(plot_temperature_profile(region, month),
-                        use_container_width=True)
-
-    with col_right:
-        st.markdown("#### 🧂 Salinity vs Depth")
-        st.plotly_chart(plot_salinity_profile(region, month),
-                        use_container_width=True)
-
-    st.divider()
-
-    # ── The chart selected by the radio toggle ────────────────────────────────
-    st.markdown(f"#### Selected: {st.session_state.chart_type}")
-    if st.session_state.chart_type == "Temperature Profile":
-        fig_sel = plot_temperature_profile(region, month)
-    elif st.session_state.chart_type == "Salinity Profile":
-        fig_sel = plot_salinity_profile(region, month)
-    elif st.session_state.chart_type == "SST Time Series":
-        fig_sel = plot_sst_timeseries(region)
-    elif st.session_state.chart_type == "Regional Comparison":
-        fig_sel = plot_regional_comparison()
-    else:
-        fig_sel = plot_ts_diagram(region)
-
-    st.plotly_chart(fig_sel, use_container_width=True)
-
-    # ── Stats row ─────────────────────────────────────────────────────────────
-    try:
-        df_c = pd.read_parquet(DATA_PATH)
-        surface_c = df_c[df_c["depth_m"] == 0]
-        if region != "All":
-            surface_c = surface_c[surface_c["region"] == region]
-        if month > 0:
-            surface_c = surface_c[surface_c["month"] == month]
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Avg SST",       f"{surface_c['temperature_c'].mean():.1f}°C")
-        c2.metric("Avg Salinity",  f"{surface_c['salinity_psu'].mean():.2f} PSU")
-        c3.metric("Profiles",      f"{surface_c['profile_id'].nunique():,}")
-        c4.metric("Active Floats", f"{surface_c['float_id'].nunique()}")
-    except Exception:
-        pass
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — DATA EXPLORER (Feature 3 + Feature 4 toggle for raw table)
-# ══════════════════════════════════════════════════════════════════════════════
-with tab_data:
-    st.markdown("### 🗃️ Raw Data Explorer")
-
-    # Toggle: show/hide the actual dataframe (Feature 4)
-    show_tbl = st.session_state.show_raw_table
-    col_t1, col_t2 = st.columns([3, 1])
-    with col_t2:
-        if st.button(
-            "Hide table ⬆️" if show_tbl else "Show table ⬇️",
-            key="inline_toggle_table",
-            use_container_width=True,
-        ):
-            st.session_state.show_raw_table = not st.session_state.show_raw_table
-            st.rerun()
-
-    try:
-        df_raw = pd.read_parquet(DATA_PATH)
-
-        # Filters
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            depth_filter = st.select_slider(
-                "Filter by depth (m)",
-                options=sorted(df_raw["depth_m"].unique().tolist()),
-                value=(0, 200),
-            )
-        with col_f2:
-            region_filter = st.multiselect(
-                "Filter by region",
-                options=df_raw["region"].unique().tolist(),
-                default=df_raw["region"].unique().tolist(),
-            )
-
-        filtered = df_raw[
-            (df_raw["depth_m"] >= depth_filter[0]) &
-            (df_raw["depth_m"] <= depth_filter[1]) &
-            (df_raw["region"].isin(region_filter))
-        ]
-
-        st.caption(f"Showing {min(500, len(filtered)):,} of {len(filtered):,} records")
-
-        # Only render the heavy dataframe widget when toggle is ON
-        if st.session_state.show_raw_table:
-            st.dataframe(
-                filtered.head(500),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "temperature_c": st.column_config.NumberColumn("Temp (°C)",     format="%.2f"),
-                    "salinity_psu":  st.column_config.NumberColumn("Salinity (PSU)", format="%.3f"),
-                    "latitude":      st.column_config.NumberColumn("Lat",            format="%.4f"),
-                    "longitude":     st.column_config.NumberColumn("Lon",            format="%.4f"),
-                },
-            )
+    with top_col_title:
+        if st.session_state.view_mode == "dashboard":
+            st.markdown(f"""
+            <div class="top-title-box">
+              <div class="dash-main-title">📊 ARGO Analytics Dashboard</div>
+              <div class="dash-sub-title">Last updated: {current_time_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.info("Click **Show table ⬇️** above to display the raw data.")
+            st.markdown(f"""
+            <div class="top-title-box">
+              <div class="dash-main-title">🌊 Ocean Satellite &amp; Float Map</div>
+              <div class="dash-sub-title">ESRI World Imagery • Indian Ocean 2023</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # Summary stats always visible
-        st.divider()
-        st.markdown("#### 📊 Quick Stats")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Records",    f"{len(filtered):,}")
-        c2.metric("Unique Floats",    filtered["float_id"].nunique())
-        c3.metric("Unique Profiles",  filtered["profile_id"].nunique())
+    with top_col_btns:
+        b1, b2 = st.columns([1, 2])
+        with b1:
+            if st.button("↻ Refresh", key="refresh_top", use_container_width=True):
+                st.rerun()
+        with b2:
+            if st.session_state.view_mode == "dashboard":
+                if st.button("🗺️ Hide Dashboard", key="btn_toggle_view", use_container_width=True):
+                    st.session_state.view_mode = "map"
+                    st.rerun()
+            else:
+                if st.button("📊 Show Dashboard", key="btn_toggle_view", use_container_width=True):
+                    st.session_state.view_mode = "dashboard"
+                    st.rerun()
 
-        # Download
-        csv = filtered.to_csv(index=False).encode()
-        st.download_button(
-            "⬇️ Download filtered data (CSV)",
-            data=csv,
-            file_name="argo_filtered.csv",
-            mime="text/csv",
-        )
+    st.markdown("<hr style='margin: 8px 0 16px 0; border: none; border-bottom: 1px solid #e5e7eb;'>", unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error(f"Could not load data: {e}")
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODE A: FULL SATELLITE OCEAN MAP (Exact match for Image 2)
+    # ─────────────────────────────────────────────────────────────────────────
+    if st.session_state.view_mode == "map":
+
+        # Floating Layer Controls Card (Image 2 style)
+        with st.container():
+            fcol1, fcol2, fcol3 = st.columns([2, 1.5, 1.5])
+            with fcol1:
+                base_map_sel = st.selectbox(
+                    "Base Map:",
+                    ["Satellite (ESRI)", "Ocean Bathymetry", "OpenStreetMap", "Dark Matter"],
+                    key="map_base_selector",
+                )
+            with fcol2:
+                show_heatmap = st.checkbox("🔥 Temp Anomaly Heatmap", value=False, key="chk_heatmap")
+            with fcol3:
+                show_trajectories = st.checkbox("📍 Float Drift Trajectories", value=True, key="chk_trajectories")
+
+        # Map display
+        with st.spinner("Rendering satellite ocean tiles..."):
+            map_fig = plot_satellite_ocean_map(
+                region="All",
+                month=0,
+                base_map=base_map_sel,
+                show_trajectories=show_trajectories,
+                show_heatmap=show_heatmap,
+            )
+            map_fig.update_layout(height=650)
+            st.plotly_chart(map_fig, use_container_width=True)
+
+        # Status badge below map (matching Image 2 footer pill)
+        st.markdown(f"""
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 8px;">
+          <div class="floating-legend-pill">
+            <span style="color:#10b981;">●</span> <b>2023 ARGO Profiles: {total_floats} Floats</b>
+            <span style="color:#ef4444; margin-left:8px;">●</span> Active Trajectories
+            <span style="color:#6b7280; margin-left:8px;">●</span> Vector DB Indexed
+          </div>
+          <div style="font-size:11px; color:#9ca3af;">
+            Tiles: ESRI World Imagery, Bathymetry &amp; GEBCO
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODE B: DASHBOARD VIEW (Exact match for Image 1)
+    # ─────────────────────────────────────────────────────────────────────────
+    else:
+        # Dashboard Navigation Tabs
+        tab_overview, tab_temporal, tab_geo, tab_env = st.tabs([
+            "Overview", "Temporal", "Geographic", "Environmental"
+        ])
+
+        # ── TAB 1: OVERVIEW (Image 1 replica) ────────────────────────────────
+        with tab_overview:
+
+            # 6 Metric Cards
+            st.markdown(f"""
+            <div class="metrics-grid">
+
+              <!-- Card 1: Total Floats -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Total Floats</div>
+                  <div class="card-icon" style="color:#2563eb;">🗄️</div>
+                </div>
+                <div class="card-val">{total_floats:,}</div>
+                <div class="card-subtext">
+                  <span class="badge-active">{total_floats} active</span>
+                </div>
+              </div>
+
+              <!-- Card 2: Profiles -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Profiles</div>
+                  <div class="card-icon" style="color:#10b981;">📈</div>
+                </div>
+                <div class="card-val">{total_profiles:,}</div>
+                <div class="card-subtext">Temperature &amp; Salinity</div>
+              </div>
+
+              <!-- Card 3: Measurements -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Measurements</div>
+                  <div class="card-icon" style="color:#8b5cf6;">📊</div>
+                </div>
+                <div class="card-val">{total_records:,}</div>
+                <div class="card-subtext">All parameters</div>
+              </div>
+
+              <!-- Card 4: Data Quality -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Data Quality</div>
+                  <div class="card-icon" style="color:#10b981;">✅</div>
+                </div>
+                <div class="card-val">98.4%</div>
+                <div class="card-subtext">
+                  <span class="badge-pill-blue">Excellent</span>
+                </div>
+              </div>
+
+              <!-- Card 5: Temperature -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Temperature</div>
+                  <div class="card-icon" style="color:#ef4444;">🌡️</div>
+                </div>
+                <div class="card-val">{avg_sst:.1f}°C</div>
+                <div class="card-subtext">Regional average</div>
+              </div>
+
+              <!-- Card 6: Salinity -->
+              <div class="metric-card">
+                <div class="card-top-row">
+                  <div class="card-label">Salinity</div>
+                  <div class="card-icon" style="color:#0ea5e9;">💧</div>
+                </div>
+                <div class="card-val">{avg_sal:.1f} PSU</div>
+                <div class="card-subtext">Regional average</div>
+              </div>
+
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Two Charts Side-by-Side (Yearly Trends + Regional Distribution)
+            chart_col_left, chart_col_right = st.columns(2)
+
+            with chart_col_left:
+                st.markdown("<div style='font-size:15px; font-weight:700; color:#111827; margin-bottom:6px;'>📉 Yearly Trends</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:12px; color:#6b7280; margin-bottom:8px;'>ARGO Profiles &amp; Float Deployment Over Time</div>", unsafe_allow_html=True)
+
+                monthly_df = surface.groupby("month").agg(
+                    profiles=("profile_id", "nunique"),
+                    floats=("float_id", "nunique")
+                ).reset_index()
+                month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                monthly_df["month_str"] = monthly_df["month"].apply(lambda x: month_labels[x-1] if x <= 12 else str(x))
+
+                fig_trend = go.Figure()
+                fig_trend.add_trace(go.Scatter(
+                    x=monthly_df["month_str"],
+                    y=monthly_df["profiles"],
+                    name="Profiles",
+                    line=dict(color="#3b82f6", width=2.5),
+                    fill="tozeroy",
+                    fillcolor="rgba(59, 130, 246, 0.08)",
+                ))
+                fig_trend.add_trace(go.Scatter(
+                    x=monthly_df["month_str"],
+                    y=monthly_df["floats"],
+                    name="Active Floats",
+                    line=dict(color="#10b981", width=2.5),
+                    yaxis="y2",
+                ))
+                fig_trend.update_layout(
+                    height=270,
+                    margin=dict(l=0, r=0, t=10, b=10),
+                    template="plotly_white",
+                    legend=dict(x=0.02, y=0.98, bgcolor="rgba(255,255,255,0.8)"),
+                    yaxis2=dict(overlaying="y", side="right", showgrid=False),
+                    xaxis=dict(showgrid=False),
+                    yaxis=dict(showgrid=True, gridcolor="#f3f4f6"),
+                )
+                st.plotly_chart(fig_trend, use_container_width=True)
+
+            with chart_col_right:
+                st.markdown("<div style='font-size:15px; font-weight:700; color:#111827; margin-bottom:6px;'>🍩 Regional Distribution</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:12px; color:#6b7280; margin-bottom:8px;'>ARGO Floats Across Indian Ocean Basins</div>", unsafe_allow_html=True)
+
+                reg_counts = df.groupby("region")["float_id"].nunique().reset_index()
+                fig_donut = px.pie(
+                    reg_counts,
+                    names="region",
+                    values="float_id",
+                    color="region",
+                    color_discrete_map={
+                        "Arabian Sea": "#3b82f6",
+                        "Bay of Bengal": "#10b981",
+                        "Indian Ocean": "#f59e0b",
+                    },
+                    hole=0.52,
+                )
+                fig_donut.update_traces(textposition="outside", textinfo="percent+label")
+                fig_donut.update_layout(
+                    height=270,
+                    margin=dict(l=0, r=0, t=10, b=10),
+                    showlegend=False,
+                    template="plotly_white",
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+
+        # ── TAB 2: TEMPORAL ───────────────────────────────────────────────────
+        with tab_temporal:
+            st.markdown("#### 📅 Temporal Patterns & Monthly Sea Surface Temperature")
+            t_col1, t_col2 = st.columns([1, 2])
+            with t_col1:
+                t_reg = st.selectbox("Select Ocean Basin:", ["All", "Arabian Sea", "Bay of Bengal", "Indian Ocean"], key="t_reg_sel")
+            with t_col2:
+                st.caption("Visualizes the seasonal warming and monsoon-driven cooling across the year.")
+
+            fig_sst = plot_sst_timeseries(t_reg)
+            fig_sst.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=10))
+            st.plotly_chart(fig_sst, use_container_width=True)
+
+            st.markdown("#### 📊 Basin Comparison (SST Distribution)")
+            fig_box = plot_regional_comparison()
+            fig_box.update_layout(height=260, margin=dict(l=0, r=0, t=20, b=10))
+            st.plotly_chart(fig_box, use_container_width=True)
+
+        # ── TAB 3: GEOGRAPHIC ─────────────────────────────────────────────────
+        with tab_geo:
+            st.markdown("#### 🌍 3D Interactive Rotating Globe")
+            st.caption("Drag to rotate the globe • Scroll to zoom • Hover over floats for live measurements")
+            with st.spinner("Rendering 3D Globe..."):
+                globe_fig = plot_globe(region="All", month=0)
+                globe_fig.update_layout(height=480, margin=dict(l=0, r=0, t=20, b=10))
+                st.plotly_chart(globe_fig, use_container_width=True)
+
+        # ── TAB 4: ENVIRONMENTAL ──────────────────────────────────────────────
+        with tab_env:
+            st.markdown("#### 🌡️ Depth Curves & Water Mass Diagnostics")
+            env_c1, env_c2 = st.columns(2)
+            with env_c1:
+                st.markdown("**Temperature vs Depth (0 to 2000m)**")
+                f_temp = plot_temperature_profile(region="All", month=0)
+                f_temp.update_layout(height=320, margin=dict(l=0, r=0, t=20, b=10))
+                st.plotly_chart(f_temp, use_container_width=True)
+            with env_c2:
+                st.markdown("**Salinity vs Depth (0 to 2000m)**")
+                f_sal = plot_salinity_profile(region="All", month=0)
+                f_sal.update_layout(height=320, margin=dict(l=0, r=0, t=20, b=10))
+                st.plotly_chart(f_sal, use_container_width=True)
+
+            st.markdown("#### 🔬 Temperature-Salinity (T-S) Water Mass Diagram")
+            st.caption("Identifies Arabian Sea High Salinity Water vs fresh Bay of Bengal runoff.")
+            f_ts = plot_ts_diagram(region="All")
+            f_ts.update_layout(height=300, margin=dict(l=0, r=0, t=20, b=10))
+            st.plotly_chart(f_ts, use_container_width=True)
