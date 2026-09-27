@@ -113,7 +113,9 @@ def plot_temperature_profile(region: str = "All", month: int = 0) -> go.Figure:
         yaxis_title="Depth (m)",
         yaxis=dict(autorange="reversed"),
         height=450,
-        template="plotly_white",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(x=0.7, y=0.95),
     )
     return fig
@@ -154,7 +156,9 @@ def plot_salinity_profile(region: str = "All", month: int = 0) -> go.Figure:
         yaxis_title="Depth (m)",
         yaxis=dict(autorange="reversed"),
         height=450,
-        template="plotly_white",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
     return fig
 
@@ -178,10 +182,15 @@ def plot_sst_timeseries(region: str = "All") -> go.Figure:
         markers=True,
         title=f"Monthly Mean Sea Surface Temperature — {region}",
         labels={"temperature_c": "SST (°C)", "month_name": "Month"},
-        color_discrete_sequence=["#E4002B"],
+        color_discrete_sequence=["#38bdf8"],
     )
     fig.update_traces(line=dict(width=3), marker=dict(size=8))
-    fig.update_layout(height=400, template="plotly_white")
+    fig.update_layout(
+        height=400,
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 
@@ -200,12 +209,18 @@ def plot_regional_comparison() -> go.Figure:
         title="SST Distribution by Region",
         labels={"temperature_c": "Temperature (°C)", "region": "Region"},
         color_discrete_map={
-            "Arabian Sea": "#1f77b4",
-            "Bay of Bengal": "#ff7f0e",
-            "Indian Ocean": "#2ca02c",
+            "Arabian Sea": "#3b82f6",
+            "Bay of Bengal": "#10b981",
+            "Indian Ocean": "#f59e0b",
         },
     )
-    fig.update_layout(height=400, template="plotly_white", showlegend=False)
+    fig.update_layout(
+        height=400,
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+    )
     return fig
 
 
@@ -223,7 +238,7 @@ def plot_ts_diagram(region: str = "All") -> go.Figure:
         sample, x="salinity_psu", y="temperature_c",
         color="depth_m",
         color_continuous_scale="Viridis_r",
-        opacity=0.5,
+        opacity=0.6,
         title=f"T-S Diagram — {region}",
         labels={
             "salinity_psu": "Salinity (PSU)",
@@ -232,7 +247,12 @@ def plot_ts_diagram(region: str = "All") -> go.Figure:
         },
     )
     fig.update_traces(marker=dict(size=4))
-    fig.update_layout(height=450, template="plotly_white")
+    fig.update_layout(
+        height=450,
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     return fig
 
 

@@ -113,16 +113,17 @@ if "groq_key" not in st.session_state:
     except Exception:
         st.session_state.groq_key = os.getenv("GROQ_API_KEY", "")
 
-# ── Master CSS matching Reference UI ──────────────────────────────────────────
+# ── Master CSS matching Reference UI (High-Tech Dark Theme) ─────────────────
 st.markdown("""
 <style>
-  /* Global page setup */
+  /* Global Page Setup - Deep Obsidian Dark Theme */
   .stApp {
-    background-color: #f3f4f6 !important;
+    background-color: #0b0f19 !important;
+    color: #f1f5f9 !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
   }
   .main .block-container {
-    padding: 8px 12px !important;
+    padding: 8px 14px !important;
     max-width: 100% !important;
   }
   section[data-testid="stSidebar"] {
@@ -134,19 +135,19 @@ st.markdown("""
 
   /* Left Panel (Chat) */
   .chat-container {
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    background: #111827 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
     display: flex;
     flex-direction: column;
     height: 94vh;
     overflow: hidden;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #1f293d !important;
   }
   .chat-header {
-    background: #ffffff;
-    border-bottom: 1px solid #f0f0f0;
-    padding: 14px 20px;
+    background: #111827 !important;
+    border-bottom: 1px solid #1f293d !important;
+    padding: 12px 18px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -155,12 +156,13 @@ st.markdown("""
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: #eef2ff;
+    background: #1e293b !important;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 22px;
-    border: 1px solid #e0e7ff;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
   }
   .chat-title-box {
     display: flex;
@@ -169,11 +171,11 @@ st.markdown("""
   .chat-name {
     font-size: 16px;
     font-weight: 700;
-    color: #111827;
+    color: #f8fafc !important;
   }
   .chat-status {
     font-size: 12px;
-    color: #10b981;
+    color: #10b981 !important;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -182,94 +184,74 @@ st.markdown("""
   .chat-status::before {
     content: "●";
     font-size: 10px;
-  }
-  .header-actions {
-    margin-left: auto;
-    display: flex;
-    gap: 8px;
-  }
-  .pill-action {
-    background: #f0fdf4;
-    color: #166534;
-    border: 1px solid #bbf7d0;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .pill-audio {
-    background: #eff6ff;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    box-shadow: 0 0 6px #10b981;
   }
 
-  /* Chat conversation stream */
+  /* Chat stream */
   .chat-stream {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px;
+    padding: 14px 18px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+    background: #0d131f !important;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    margin-bottom: 8px;
+    max-height: 420px;
   }
   .user-bubble {
     align-self: flex-end;
-    background: #dbeafe;
-    color: #1e3a8a;
-    padding: 12px 18px;
-    border-radius: 20px 20px 4px 20px;
+    background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
+    color: #ffffff !important;
+    padding: 11px 16px;
+    border-radius: 18px 18px 4px 18px;
     max-width: 82%;
     font-size: 14px;
     line-height: 1.5;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
   }
   .bot-bubble {
     align-self: flex-start;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    color: #1f2937;
-    padding: 14px 18px;
-    border-radius: 20px 20px 20px 4px;
+    background: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #f1f5f9 !important;
+    padding: 13px 18px;
+    border-radius: 18px 18px 18px 4px;
     max-width: 92%;
     font-size: 14px;
     line-height: 1.6;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+  .bot-bubble b, .bot-bubble strong {
+    color: #38bdf8 !important;
   }
   .time-stamp {
     font-size: 10px;
-    color: #9ca3af;
+    color: #94a3b8 !important;
     margin-top: 4px;
     text-align: right;
   }
 
   /* Right Panel (Dashboard & Map) */
   .right-panel-container {
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    background: #111827 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
     height: 94vh;
     overflow-y: auto;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #1f293d !important;
     display: flex;
     flex-direction: column;
   }
   .top-action-bar {
-    background: #ffffff;
-    padding: 16px 24px;
+    background: #111827 !important;
+    padding: 14px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #1f293d !important;
     position: sticky;
     top: 0;
     z-index: 20;
@@ -282,31 +264,36 @@ st.markdown("""
   .dash-main-title {
     font-size: 20px;
     font-weight: 800;
-    color: #111827;
+    color: #f8fafc !important;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   .dash-sub-title {
     font-size: 12px;
-    color: #6b7280;
+    color: #94a3b8 !important;
     margin-top: 2px;
   }
 
-  /* Metric cards (exact Image 1 layout) */
+  /* Metric cards in dark mode */
   .metrics-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    padding: 18px 24px 8px 24px;
+    gap: 14px;
+    padding: 16px 20px 8px 20px;
   }
   .metric-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: #161f30 !important;
+    border: 1px solid #26354a !important;
     border-radius: 14px;
-    padding: 16px 20px;
+    padding: 14px 18px;
     position: relative;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+  }
+  .metric-card:hover {
+    border-color: #38bdf8 !important;
+    transform: translateY(-2px);
   }
   .card-top-row {
     display: flex;
@@ -316,7 +303,7 @@ st.markdown("""
   .card-label {
     font-size: 13px;
     font-weight: 600;
-    color: #4b5563;
+    color: #94a3b8 !important;
   }
   .card-icon {
     font-size: 16px;
@@ -324,76 +311,94 @@ st.markdown("""
   .card-val {
     font-size: 26px;
     font-weight: 800;
-    color: #111827;
+    color: #38bdf8 !important;
     margin-top: 6px;
     line-height: 1.1;
   }
   .card-subtext {
     font-size: 11px;
-    color: #6b7280;
+    color: #64748b !important;
     margin-top: 6px;
     display: flex;
     align-items: center;
     gap: 6px;
   }
   .badge-active {
-    background: #f3f4f6;
-    color: #374151;
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    border: 1px solid #334155 !important;
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 11px;
     font-weight: 600;
   }
   .badge-pill-blue {
-    background: #2563eb;
-    color: #ffffff;
+    background: #059669 !important;
+    color: #ffffff !important;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 11px;
     font-weight: 700;
   }
 
-  /* Floating Overlay Controls on Map (Image 2) */
-  .floating-map-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(229, 231, 235, 0.9);
-    border-radius: 12px;
-    padding: 14px 18px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    margin-bottom: 12px;
-  }
+  /* Floating Overlay Controls on Map */
   .floating-legend-pill {
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid #e5e7eb;
+    background: rgba(17, 24, 39, 0.95) !important;
+    border: 1px solid #374151 !important;
     border-radius: 20px;
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
+    color: #f1f5f9 !important;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
   }
 
-  /* Streamlit native widget styling */
+  /* Streamlit inputs in dark theme */
   .stTextInput > div > div > input {
     border-radius: 24px !important;
     padding: 10px 16px !important;
-    background: #f9fafb !important;
-    border: 1px solid #e5e7eb !important;
+    background: #161f30 !important;
+    border: 1px solid #374151 !important;
+    color: #f9fafb !important;
     font-size: 14px !important;
+  }
+  .stTextInput > div > div > input:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.4) !important;
   }
   .stButton > button {
     border-radius: 20px !important;
     font-weight: 600 !important;
-    border: none !important;
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #374151 !important;
     transition: all 0.2s ease !important;
   }
-  .primary-btn > button {
+  .stButton > button:hover {
     background: #2563eb !important;
     color: #ffffff !important;
-    box-shadow: 0 2px 8px rgba(37,99,235,0.3) !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 12px rgba(37, 99, 235, 0.5) !important;
+  }
+
+  /* Tabs styling in dark mode */
+  button[data-baseweb="tab"] {
+    color: #94a3b8 !important;
+  }
+  button[data-baseweb="tab"][aria-selected="true"] {
+    color: #38bdf8 !important;
+    border-bottom-color: #38bdf8 !important;
+  }
+  div[data-testid="stExpander"] {
+    background: #161f30 !important;
+    border: 1px solid #26354a !important;
+    border-radius: 12px !important;
+  }
+  div[data-testid="stExpander"] * {
+    color: #f1f5f9 !important;
   }
 </style>
 """, unsafe_allow_html=True)
@@ -486,10 +491,10 @@ col_left, col_right = st.columns([3.8, 6.2], gap="small")
 # LEFT COLUMN — CHAT PANEL (Outrage Ocean AI)
 # ══════════════════════════════════════════════════════════════════════════════
 with col_left:
-    hdr_info, hdr_audio_btn = st.columns([3, 1.4])
+    hdr_info, hdr_stop_btn, hdr_audio_btn = st.columns([2.0, 1.2, 1.2])
     with hdr_info:
         st.markdown("""
-        <div style="display:flex; align-items:center; gap:12px; padding: 2px 0;">
+        <div style="display:flex; align-items:center; gap:10px; padding: 2px 0;">
           <div class="chat-avatar">⚡</div>
           <div class="chat-title-box">
             <div class="chat-name">Outrage</div>
@@ -497,11 +502,32 @@ with col_left:
           </div>
         </div>
         """, unsafe_allow_html=True)
+    with hdr_stop_btn:
+        if st.button("⏹️ Stop Voice", key="hdr_stop_voice", use_container_width=True):
+            st.session_state.speak_text = ""
+            st.session_state.stop_voice = True
+            st.rerun()
     with hdr_audio_btn:
         audio_toggle_label = "🔊 Voice: ON" if st.session_state.audio_enabled else "🔇 Voice: OFF"
         if st.button(audio_toggle_label, key="hdr_toggle_audio", use_container_width=True):
             st.session_state.audio_enabled = not st.session_state.audio_enabled
+            if not st.session_state.audio_enabled:
+                st.session_state.stop_voice = True
             st.rerun()
+
+    # Cancel speech if stop requested
+    if st.session_state.get("stop_voice", False):
+        components.html("""
+        <script>
+        (function() {
+            const win = window.parent || window;
+            if (win.speechSynthesis) {
+                win.speechSynthesis.cancel();
+            }
+        })();
+        </script>
+        """, height=0)
+        st.session_state.stop_voice = False
 
     # API key setup (in sleek expander)
     with st.expander("🔑 Groq API Key Config", expanded=not bool(st.session_state.groq_key)):
@@ -521,7 +547,7 @@ with col_left:
 
     # ── Ocean Region Selector ─────────────────────────────────────────────────
     st.markdown("""
-    <div style="font-size:13px; font-weight:700; color:#1f2937; padding: 4px 0 4px 2px;">
+    <div style="font-size:13px; font-weight:700; color:#f8fafc; padding: 4px 0 4px 2px;">
       🌊 Select Ocean Region for Analysis:
     </div>
     """, unsafe_allow_html=True)
@@ -545,12 +571,12 @@ with col_left:
     sel_ocean = st.session_state.get("selected_ocean", "All")
     ocean_display = sel_ocean if sel_ocean != "All" else "All Ocean Regions"
     st.markdown(
-        f"<div style='font-size:11px; color:#6b7280; margin-bottom:4px;'>📍 Context: <b>{ocean_display}</b></div>",
+        f"<div style='font-size:11px; color:#94a3b8; margin-bottom:4px;'>📍 Context: <b style='color:#38bdf8;'>{ocean_display}</b></div>",
         unsafe_allow_html=True
     )
 
     # Suggested Prompts (chips) — dynamically use selected ocean
-    st.markdown("<div style='font-size: 12px; font-weight: 600; color: #6b7280; padding: 2px 0;'>💡 Quick queries:</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 12px; font-weight: 600; color: #94a3b8; padding: 2px 0;'>💡 Quick queries:</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     chip_region = sel_ocean if sel_ocean != "All" else "Arabian Sea"
     if c1.button(f"SST in {chip_region}?", key="chip_1", use_container_width=True):
@@ -839,8 +865,8 @@ with col_right:
             chart_col_left, chart_col_right = st.columns(2)
 
             with chart_col_left:
-                st.markdown("<div style='font-size:15px; font-weight:700; color:#111827; margin-bottom:6px;'>📉 Yearly Trends</div>", unsafe_allow_html=True)
-                st.markdown("<div style='font-size:12px; color:#6b7280; margin-bottom:8px;'>ARGO Profiles &amp; Float Deployment Over Time</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:6px;'>📉 Yearly Trends</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:12px; color:#94a3b8; margin-bottom:8px;'>ARGO Profiles &amp; Float Deployment Over Time</div>", unsafe_allow_html=True)
 
                 monthly_df = surface.groupby("month").agg(
                     profiles=("profile_id", "nunique"),
@@ -854,9 +880,9 @@ with col_right:
                     x=monthly_df["month_str"],
                     y=monthly_df["profiles"],
                     name="Profiles",
-                    line=dict(color="#3b82f6", width=2.5),
+                    line=dict(color="#38bdf8", width=2.5),
                     fill="tozeroy",
-                    fillcolor="rgba(59, 130, 246, 0.08)",
+                    fillcolor="rgba(56, 189, 248, 0.12)",
                 ))
                 fig_trend.add_trace(go.Scatter(
                     x=monthly_df["month_str"],
@@ -868,17 +894,19 @@ with col_right:
                 fig_trend.update_layout(
                     height=270,
                     margin=dict(l=0, r=0, t=10, b=10),
-                    template="plotly_white",
-                    legend=dict(x=0.02, y=0.98, bgcolor="rgba(255,255,255,0.8)"),
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(x=0.02, y=0.98, bgcolor="rgba(17,24,39,0.85)", font=dict(color="#f1f5f9")),
                     yaxis2=dict(overlaying="y", side="right", showgrid=False),
                     xaxis=dict(showgrid=False),
-                    yaxis=dict(showgrid=True, gridcolor="#f3f4f6"),
+                    yaxis=dict(showgrid=True, gridcolor="#1e293b"),
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
             with chart_col_right:
-                st.markdown("<div style='font-size:15px; font-weight:700; color:#111827; margin-bottom:6px;'>🍩 Regional Distribution</div>", unsafe_allow_html=True)
-                st.markdown("<div style='font-size:12px; color:#6b7280; margin-bottom:8px;'>ARGO Floats Across Indian Ocean Basins</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:6px;'>🍩 Regional Distribution</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:12px; color:#94a3b8; margin-bottom:8px;'>ARGO Floats Across Indian Ocean Basins</div>", unsafe_allow_html=True)
 
                 reg_counts = df.groupby("region")["float_id"].nunique().reset_index()
                 fig_donut = px.pie(
@@ -898,7 +926,9 @@ with col_right:
                     height=270,
                     margin=dict(l=0, r=0, t=10, b=10),
                     showlegend=False,
-                    template="plotly_white",
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
 

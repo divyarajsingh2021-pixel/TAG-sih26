@@ -9,6 +9,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: transparent;
       overflow: hidden;
+      color: #f1f5f9;
     }
     .mic-wrap {
       display: flex;
@@ -19,7 +20,7 @@
     .mic-btn {
       background: #2563eb;
       color: white;
-      border: none;
+      border: 1px solid #3b82f6;
       border-radius: 50%;
       width: 44px;
       height: 44px;
@@ -28,21 +29,23 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+      box-shadow: 0 0 12px rgba(37,99,235,0.4);
       transition: all 0.2s ease;
       flex-shrink: 0;
     }
     .mic-btn:hover {
       background: #1d4ed8;
       transform: scale(1.05);
+      box-shadow: 0 0 18px rgba(37,99,235,0.7);
     }
     .mic-btn.active {
       background: #ef4444 !important;
+      border-color: #f87171 !important;
       animation: pulse 1s infinite alternate;
     }
     @keyframes pulse {
       0%   { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); }
-      100% { transform: scale(1.12); box-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
+      100% { transform: scale(1.12); box-shadow: 0 0 16px rgba(239, 68, 68, 0.9); }
     }
     .mic-text {
       display: flex;
@@ -52,15 +55,15 @@
     .mic-label {
       font-size: 13px;
       font-weight: 700;
-      color: #1f2937;
+      color: #f1f5f9;
     }
     .mic-sub {
       font-size: 11px;
-      color: #6b7280;
+      color: #94a3b8;
     }
     .transcript-box {
       font-size: 12px;
-      color: #2563eb;
+      color: #38bdf8;
       font-weight: 600;
       margin-top: 2px;
       white-space: nowrap;
@@ -135,7 +138,6 @@
         }
         document.getElementById('trans').innerText = '“' + currentTranscript + '”';
 
-        // Check if final transcript is ready
         let finalStr = "";
         for (let j = 0; j < event.results.length; ++j) {
           if (event.results[j].isFinal) {
@@ -147,8 +149,6 @@
           document.getElementById('lbl').innerText = "✅ Sending to Outrage...";
           document.getElementById('btn').classList.remove('active');
           listening = false;
-
-          // Directly send value to Streamlit Python in real time!
           sendMessageToStreamlit("streamlit:setComponentValue", { value: finalStr.trim() });
         }
       };
