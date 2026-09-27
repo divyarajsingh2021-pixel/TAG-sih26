@@ -72,7 +72,7 @@ if "messages" not in st.session_state:
         {
             "role": "assistant",
             "content": (
-                "👋 **Welcome to FloatChat (Dolphin Ocean AI)!**\n\n"
+                "👋 **Welcome to FloatChat (Outrage Ocean AI)!**\n\n"
                 "I am your conversational interface for ARGO ocean float data. "
                 "You can ask me questions about **temperature**, **salinity**, **float trajectories**, "
                 "or **depth profiles** across the Indian Ocean, Arabian Sea, and Bay of Bengal.\n\n"
@@ -452,14 +452,14 @@ function resetMic() {
 col_left, col_right = st.columns([3.8, 6.2], gap="small")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LEFT COLUMN — CHAT PANEL (Dolphin Ocean AI)
+# LEFT COLUMN — CHAT PANEL (Outrage Ocean AI)
 # ══════════════════════════════════════════════════════════════════════════════
 with col_left:
     st.markdown("""
     <div class="chat-header">
-      <div class="chat-avatar">🐬</div>
+      <div class="chat-avatar">⚡</div>
       <div class="chat-title-box">
-        <div class="chat-name">Dolphin</div>
+        <div class="chat-name">Outrage</div>
         <div class="chat-status">Online</div>
       </div>
       <div class="header-actions">
@@ -503,7 +503,7 @@ with col_left:
         if msg["role"] == "user":
             chat_html += f'<div class="user-bubble">🧑 {content}<div class="time-stamp">{t}</div></div>'
         else:
-            chat_html += f'<div class="bot-bubble">🐬 {content}<div class="time-stamp">{t}</div></div>'
+            chat_html += f'<div class="bot-bubble">⚡ {content}<div class="time-stamp">{t}</div></div>'
     chat_html += '</div>'
     st.markdown(chat_html, unsafe_allow_html=True)
 
@@ -552,7 +552,7 @@ with col_left:
         q_reg = extract_region(user_query)
         q_m = extract_month(user_query)
 
-        with st.spinner("🐬 Dolphin is thinking..."):
+        with st.spinner("⚡ Outrage is thinking..."):
             if not st.session_state.groq_key:
                 sdf = surface[surface["region"] == q_reg] if q_reg != "All" else surface
                 bot_ans = (
@@ -575,7 +575,7 @@ with col_left:
 with col_right:
 
     # ── Top Bar with Toggle Button ────────────────────────────────────────────
-    top_col_title, top_col_btns = st.columns([3, 2])
+    top_col_title, top_col_ref, top_col_toggle = st.columns([3.2, 0.9, 1.9])
 
     with top_col_title:
         if st.session_state.view_mode == "dashboard":
@@ -593,20 +593,19 @@ with col_right:
             </div>
             """, unsafe_allow_html=True)
 
-    with top_col_btns:
-        b1, b2 = st.columns([1, 2])
-        with b1:
-            if st.button("↻ Refresh", key="refresh_top", use_container_width=True):
+    with top_col_ref:
+        if st.button("↻ Refresh", key="refresh_top", use_container_width=True):
+            st.rerun()
+
+    with top_col_toggle:
+        if st.session_state.view_mode == "dashboard":
+            if st.button("🗺️ Hide Dashboard", key="btn_toggle_view", use_container_width=True):
+                st.session_state.view_mode = "map"
                 st.rerun()
-        with b2:
-            if st.session_state.view_mode == "dashboard":
-                if st.button("🗺️ Hide Dashboard", key="btn_toggle_view", use_container_width=True):
-                    st.session_state.view_mode = "map"
-                    st.rerun()
-            else:
-                if st.button("📊 Show Dashboard", key="btn_toggle_view", use_container_width=True):
-                    st.session_state.view_mode = "dashboard"
-                    st.rerun()
+        else:
+            if st.button("📊 Show Dashboard", key="btn_toggle_view", use_container_width=True):
+                st.session_state.view_mode = "dashboard"
+                st.rerun()
 
     st.markdown("<hr style='margin: 8px 0 16px 0; border: none; border-bottom: 1px solid #e5e7eb;'>", unsafe_allow_html=True)
 
