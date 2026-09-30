@@ -1,15 +1,9 @@
-# ── Fast Streamlit Cloud requirements ──────────────────────────────────────
-# Lightweight & instant boot without heavy torch/cuda wheel downloads
-streamlit>=1.32.0,<1.42.0
-pandas>=2.1.0,<2.3.0
-numpy>=1.24.0,<2.0.0
-plotly>=5.20.0
-pyarrow>=14.0.0
-scipy>=1.11.0
-
-# Groq LLM API
-groq>=0.9.0
+streamlit
+pandas
+numpy
+plotly
+pyarrow
+scipy
+groq
 httpx==0.27.2
-
-# Utils
-python-dotenv>=1.0.0
+python-dotenv
