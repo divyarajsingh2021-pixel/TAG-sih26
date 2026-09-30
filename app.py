@@ -757,15 +757,21 @@ with col_right:
 
         # Map display
         with st.spinner("Rendering satellite ocean tiles..."):
-            map_fig = plot_satellite_ocean_map(
-                region=st.session_state.get("selected_ocean", "All"),
-                month=0,
-                base_map=base_map_sel,
-                show_trajectories=show_trajectories,
-                show_heatmap=show_heatmap,
-            )
-            map_fig.update_layout(height=650)
-            st.plotly_chart(map_fig, use_container_width=True)
+            try:
+                map_fig = plot_satellite_ocean_map(
+                    region=st.session_state.get("selected_ocean", "All"),
+                    month=0,
+                    base_map=base_map_sel,
+                    show_trajectories=show_trajectories,
+                    show_heatmap=show_heatmap,
+                )
+                map_fig.update_layout(height=650)
+                st.plotly_chart(map_fig, use_container_width=True, config={"scrollZoom": True})
+            except Exception as e:
+                st.warning("⚠️ High-resolution satellite tiles unavailable. Displaying 3D Interactive Globe fallback.")
+                fallback_fig = plot_globe(region=st.session_state.get("selected_ocean", "All"), month=0)
+                fallback_fig.update_layout(height=600)
+                st.plotly_chart(fallback_fig, use_container_width=True)
 
         # Status badge below map (matching Image 2 footer pill)
         st.markdown(f"""

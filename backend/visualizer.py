@@ -420,37 +420,41 @@ def plot_satellite_ocean_map(
     # Mapbox configuration with tile raster layers
     mapbox_config = dict(
         center=dict(lat=6.0, lon=75.0),
-        zoom=2.8,
+        zoom=2.6,
     )
 
-    if base_map == "Satellite (ESRI)":
-        mapbox_config["style"] = "white-bg"
-        mapbox_config["layers"] = [{
-            "below": "traces",
-            "sourcetype": "raster",
-            "source": [
-                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            ]
-        }]
-    elif base_map == "Ocean Bathymetry":
-        mapbox_config["style"] = "white-bg"
-        mapbox_config["layers"] = [{
-            "below": "traces",
-            "sourcetype": "raster",
-            "source": [
-                "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
-            ]
-        }]
-    elif base_map == "Dark Matter":
-        mapbox_config["style"] = "carto-darkmatter"
-    else:
+    try:
+        if base_map == "Satellite (ESRI)":
+            mapbox_config["style"] = "white-bg"
+            mapbox_config["layers"] = [{
+                "below": "traces",
+                "sourcetype": "raster",
+                "source": [
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                ]
+            }]
+        elif base_map == "Ocean Bathymetry":
+            mapbox_config["style"] = "white-bg"
+            mapbox_config["layers"] = [{
+                "below": "traces",
+                "sourcetype": "raster",
+                "source": [
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}"
+                ]
+            }]
+        elif base_map == "Dark Matter":
+            mapbox_config["style"] = "carto-darkmatter"
+        else:
+            mapbox_config["style"] = "open-street-map"
+    except Exception:
         mapbox_config["style"] = "open-street-map"
 
     fig.update_layout(
         mapbox=mapbox_config,
         margin=dict(l=0, r=0, t=0, b=0),
-        height=720,
+        height=700,
         showlegend=False,
         paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
     return fig
