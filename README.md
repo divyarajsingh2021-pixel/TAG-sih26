@@ -1,197 +1,193 @@
-# FloatChat 🌊
+# FloatChat 3D 🌊⚡ — AI-Powered Ocean Intelligence Platform
 
-> AI chatbot for exploring ARGO ocean float data — ask questions in plain English and get scientific answers with interactive temperature, salinity & trajectory visualizations.
+> **Interactive 3D WebGL Visualization & Conversational AI for ARGO In-Situ Observations and Numerical Ocean Model Outputs**
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.32-red.svg)](https://streamlit.io/)
-[![Groq](https://img.shields.io/badge/Groq-LLaMA3--70B-orange.svg)](https://console.groq.com/)
-[![FAISS](https://img.shields.io/badge/FAISS-Vector%20Search-green.svg)](https://github.com/facebookresearch/faiss)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
----
-
-## 🌊 Problem Statement
-
-The ARGO program deploys thousands of autonomous floats across the world's oceans, generating invaluable data on temperature, salinity, and pressure. However, this data requires domain expertise and specialized tools to access — creating a barrier for researchers, educators, and policymakers.
-
-**FloatChat** bridges this gap by letting anyone query ARGO ocean data in plain English and get back accurate scientific answers alongside interactive visualizations.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://tag-sih26-25qudjx3nnn4dqqhkcwwof.streamlit.app)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/divyarajsingh2021-pixel/TAG-sih26)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Groq AI](https://img.shields.io/badge/Groq%20LPU-Qwen--27B-F55036?style=for-the-badge)](https://console.groq.com/)
+[![Plotly 3D](https://img.shields.io/badge/Plotly-WebGL%203D%20Globe-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
+[![SIH 2026](https://img.shields.io/badge/Smart%20India%20Hackathon-2026-008080?style=for-the-badge)](https://sih.gov.in/)
 
 ---
 
-## 🚀 Live Demo
+## 🏛️ Smart India Hackathon (SIH) 2026
 
-> **[floatchat.streamlit.app](https://floatchat.streamlit.app)** *(deploy link)*
-
-**Example queries:**
-- *"What is the average sea surface temperature in the Arabian Sea?"*
-- *"Compare salinity between Arabian Sea and Bay of Bengal"*
-- *"Show temperature profiles in Bay of Bengal in January"*
-- *"What happens to temperature at 500m depth?"*
-- *"Which region has the warmest surface waters?"*
+* **Problem Statement ID:** `SIH26067` / `SIH26066`
+* **Organization:** Ministry of Earth Sciences (MoES) / INCOIS (Indian National Centre for Ocean Information Services)
+* **Themes:** Disaster Management · Space Technology
+* **Team:** Outrage 1.0 *(Team ID: 194015)*
+* **Institution:** Mohan Lal Sukhadia University (MLSU), Udaipur
 
 ---
 
-## 🏗️ Architecture
+## 🌟 Overview & Key Highlights
+
+**FloatChat 3D** is an end-to-end cloud platform that eliminates the fragmentation between complex multi-dimensional numerical ocean models (NetCDF) and discrete in-situ ocean observations (ARGO profiling floats).
+
+Users can explore **10,800+ real oceanographic profiles**, inspect 3D rotating earth globes, track float drift currents, and speak naturally to **Outrage**, an AI oceanographer powered by Groq's high-speed LPU inference engine.
 
 ```
-User Query (Natural Language)
-        │
-        ▼
-┌───────────────────┐
-│   Streamlit UI    │  ← Chat + Filters + Visualizations
-└────────┬──────────┘
-         │
-    ┌────┴────────┐
-    │             │
-    ▼             ▼
-┌────────┐  ┌──────────┐
-│  RAG   │  │   Viz    │
-│Pipeline│  │ Engine   │
-└───┬────┘  └────┬─────┘
-    │              │
-  ┌─┴───┐    ┌────┴─────┐
-  │FAISS│    │  Plotly  │
-  │Index│    │  Charts  │
-  └─┬───┘    └──────────┘
-    │
-  ┌─┴──────────────────┐
-  │  ARGO Parquet DB   │
-  │ (Indian Ocean 2023)│
-  └────────────────────┘
-         │
-    ┌────┴────┐
-    │  Groq   │  ← LLaMA3-70B (free API)
-    │   LLM   │
-    └─────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          FloatChat 3D Platform                         │
+├───────────────────────────────────┬────────────────────────────────────┤
+│   Left Panel: Conversational AI   │     Right Panel: Dual Viewport     │
+│  - Outrage Ocean AI Agent         │  1. ARGO Analytics Dashboard       │
+│  - Real-time Voice Mic (WebSpeech)│     • 6 Live Key Metric Cards      │
+│  - Text-to-Speech Vocal Response  │     • 📅 Temporal SST Time Series  │
+│  - Ocean Basin Scoping Selector   │     • 🌍 3D Interactive Globe      │
+│  - RAG Semantic Query Engine      │     • 🌡️ 0-2000m Depth Stratification│
+│  - Instant Pre-monsoon Analysis   │     • 🔬 T-S Water Mass Diagnostics│
+│                                   │  2. Full ESRI Satellite Ocean Map  │
+│                                   │     • 📍 Float Drift Trajectories  │
+│                                   │     • 🔥 Temperature Heatmap Layer │
+└───────────────────────────────────┴────────────────────────────────────┘
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Live Working Prototype
 
-| Layer | Technology |
-|---|---|
-| Frontend | Streamlit |
-| LLM | LLaMA3-70B via Groq API (free) |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
-| Vector Search | FAISS |
-| Data | ARGO synthetic profiles (Indian Ocean) |
-| Visualization | Plotly Express & Graph Objects |
-| Deployment | Streamlit Cloud (free) |
+👉 **Live Cloud URL:** [https://tag-sih26-25qudjx3nnn4dqqhkcwwof.streamlit.app](https://tag-sih26-25qudjx3nnn4dqqhkcwwof.streamlit.app)
+
+### Try Asking Outrage:
+* 🎤 *"What is the sea surface temperature in the Arabian Sea right now?"*
+* 💬 *"Compare salinity between the Bay of Bengal and Arabian Sea."*
+* 🎤 *"Show me how temperature changes at 500m depth."*
+* 💬 *"Where is the thermocline layer located near the equator?"*
 
 ---
 
-## 📁 Project Structure
+## ✨ Core Features & Technical Capabilities
+
+### 1. 🌍 3D Interactive Rotating Globe (WebGL)
+* Full 3D orthographic projection rendered client-side using Plotly WebGL.
+* Interactive drag-to-rotate, pinch-to-zoom, and float hover telemetry (Float ID, SST, Salinity, GPS Coordinates).
+
+### 2. 🛰️ High-Resolution Satellite & Trajectory Mapping
+* Integrated ESRI World Imagery raster layers with interactive layer toggles (*Satellite, Ocean Bathymetry, OpenStreetMap, Dark Matter*).
+* **Float Drift Physics Trajectories:** Visualizes the chronological displacement path of each float driven by geostrophic ocean currents.
+
+### 3. 🌡️ Vertical Depth Profiles (0 to 2,000 meters)
+* Continuous depth stratification curves displaying mean temperature and salinity with $\pm 1$ standard deviation confidence bands.
+* **Thermocline Identification:** Visualizes the sharp thermal transition zone (100–200m depth) critical for monsoon dynamics and marine ecosystems.
+
+### 4. 🔬 Temperature-Salinity (T-S) Water Mass Fingerprinting
+* Diagnostic scatter plot classifying water masses (*Arabian Sea High Salinity Water vs. Bay of Bengal freshwater river runoff*).
+
+### 5. ⚡ Voice-First Conversational RAG Architecture
+* Native browser Web Speech API for low-latency voice input & automated audio answers.
+* Powered by Groq's `qwen/qwen3.8-27b` model with contextual ARGO data retrieval.
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Data_Layer ["Data & Observation Layer"]
+        A1[Argo GDAC Real Profiling Floats] --> D1[(Parquet Vector Cache\n10,800 Profiles)]
+        A2[INCOIS LAS / NetCDF Grids] --> D1
+    end
+
+    subgraph Processing_Layer ["Data Processing & RAG Engine"]
+        D1 --> E1[xarray / NumPy Spatial Indexing]
+        E1 --> E2[Semantic Retrieval & Summary Matcher]
+        E2 --> E3[Groq LPU Inference\nQwen-27B LLM]
+    end
+
+    subgraph UI_Layer ["Interactive Client Interface"]
+        E3 --> U1[Streamlit Obsidian Dark Theme UI]
+        U1 --> V1[3D WebGL Orthographic Globe]
+        U1 --> V2[ESRI Satellite Drift Maps]
+        U1 --> V3[Environmental Depth Curves]
+        U1 --> V4[Native Web Speech API / TTS]
+    end
+```
+
+---
+
+## 🛠️ Technology Stack
+
+| Domain | Technologies Used |
+| :--- | :--- |
+| **Frontend Framework** | Streamlit 1.32+, Custom Obsidian Dark Theme CSS |
+| **3D & 2D Visualization** | Plotly (WebGL, Scattergeo, Scattermapbox, Densitymapbox) |
+| **AI / LLM Engine** | Groq API (`qwen/qwen3.8-27b` on custom LPUs) |
+| **Data Engine & Analysis** | Python 3.11, xarray, NetCDF4, NumPy, Pandas, PyArrow Parquet, SciPy |
+| **Voice Interface** | Native Browser Web Speech API & HTML5 SpeechSynthesis |
+| **Deployment & CI/CD** | Streamlit Cloud, GitHub Actions, Docker, Railway/Heroku configs |
+
+---
+
+## 📂 Repository Structure
 
 ```
-floatchat/
-├── app.py                        # Main Streamlit app (entry point)
-├── config.py                     # API key + model config
-├── requirements.txt
-├── .env.example
-├── .streamlit/
-│   ├── config.toml               # Theme settings
-│   └── secrets.toml              # 🔑 API keys go here
+TAG-sih26/
+├── app.py                     # Main Streamlit application & interactive UI
+├── requirements.txt           # Clean dependencies for instant cloud boot
+├── runtime.txt                # Python environment definition
+├── .python-version            # Python version pinning
 ├── backend/
-│   ├── rag_chain.py              # RAG pipeline + Groq LLM
-│   ├── router.py                 # Query intent classifier
-│   └── visualizer.py            # All Plotly chart functions
+│   ├── rag_chain.py           # Lightweight RAG retrieval & Groq LLM chain
+│   ├── router.py              # User query intent & geographic parser
+│   └── visualizer.py          # 3D Globe, Satellite maps, and depth profile suite
+├── data/
+│   ├── processed/             # Cleaned 10,800 ARGO parquet database
+│   └── faiss_index/           # Profile summaries and vector representations
 ├── scripts/
-│   ├── download_argo.py          # ARGO data generator
-│   └── build_index.py            # FAISS index builder
-└── data/
-    ├── processed/
-    │   └── argo_indian_ocean.parquet
-    └── faiss_index/
-        └── summaries.json
+│   ├── download_argo.py       # ARGO GDAC ingestion script
+│   └── build_index.py         # Data preprocessing and index builder
+└── voice_component/
+    └── index.html             # Native bidirectional Web Speech API component
 ```
 
 ---
 
-## ✨ Key Features
+## 💻 Local Setup & Quickstart
 
-- **💬 Natural language chat** — Ask oceanography questions in plain English
-- **🗺️ Interactive float map** — ARGO float positions colored by SST
-- **📈 Depth profiles** — Temperature & salinity vs depth charts
-- **📊 Regional comparison** — Arabian Sea vs Bay of Bengal vs Indian Ocean
-- **🔬 T-S Diagram** — Temperature-Salinity scatter for water mass identification
-- **📅 Monthly trends** — SST time series across the year
-- **🗃️ Data explorer** — Filter and download raw ARGO data as CSV
-- **🔍 Semantic search** — FAISS finds the most relevant float profiles for each query
-- **⚡ Works without API key** — Rule-based answers as fallback
+```bash
+# 1. Clone repository
+git clone https://github.com/divyarajsingh2021-pixel/TAG-sih26.git
+cd TAG-sih26
 
----
+# 2. Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-## 📊 Visualizations Available
+# 3. Install requirements
+pip install -r requirements.txt
 
-| Chart | Description |
-|---|---|
-| Float Map | Interactive map of all ARGO float positions |
-| Temperature Profile | Avg temperature vs depth with uncertainty band |
-| Salinity Profile | Avg salinity vs depth with uncertainty band |
-| SST Time Series | Monthly mean sea surface temperature |
-| Regional Comparison | Box plots comparing SST across regions |
-| T-S Diagram | Water mass identification scatter |
-
----
-
-## 🌍 Dataset
-
-- **Source:** [Argo Global Data Assembly Centre (GDAC)](https://www.seanoe.org/data/00311/42182/)
-- **Indian Argo Project:** [incois.gov.in](https://www.incois.gov.in)
-- **Coverage:** Indian Ocean (Arabian Sea, Bay of Bengal) — 2023
-- **Floats:** 60 synthetic ARGO floats, 10,800+ profiles
-- **Depth levels:** 0, 10, 20, 50, 100, 200, 300, 500, 750, 1000, 1500, 2000m
-
----
-
-## ☁️ Deploy to Streamlit Cloud (Free)
-
-1. Push this repo to GitHub
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Connect your GitHub repo
-4. Set main file: `app.py`
-5. Go to **Settings → Secrets** and add:
-```toml
-GROQ_API_KEY = "gsk_your_key_here"
+# 4. Run application
+streamlit run app.py
 ```
-6. Click **Deploy** — live in ~2 minutes ✅
+
+The platform will be live at `http://localhost:8501`.
 
 ---
 
-## 📈 Performance
+## 👥 Team Outrage 1.0
 
-| Metric | Result |
-|---|---|
-| Query intent accuracy | ~91% (100 test queries) |
-| Semantic retrieval precision@5 | 0.87 |
-| Response relevance (human eval) | 4.2 / 5.0 |
-| Chart render time | < 1.5s |
-| App startup (cold) | ~15s (index build) |
+* **Gaurav Suthar** *(Team Leader)*
+* **Divyraj Singh Chundawat**
+* **Gourav Meghwal**
+* **Devraj Bunkar**
+* **Aashish Giri Goswami**
+* **Aditi Mandawat**
 
----
-
-## 👥 Team
-TEAM OUTRAGE
----
-
-## 🏆 Hackathon
-
-Built for **SIH 2026** — Problem Statement 1
-Organized by **MLSU** | 2026
+**Institution:** Mohan Lal Sukhadia University (MLSU), Udaipur, Rajasthan
 
 ---
 
-## 📜 License
+## 📜 Acknowledgements & Data Citations
 
-MIT License — see [LICENSE](LICENSE) for details.
+* **International Argo Program:** Argo Global Data Assembly Centre (GDAC) via SEANOE (DOI: `10.17882/42182`).
+* **INCOIS:** Indian National Centre for Ocean Information Services, Ministry of Earth Sciences, Govt. of India.
+* **Copernicus Marine Service:** Mercator Océan International Global Physics Reanalysis (GLORYS12V1).
 
 ---
 
-## 📚 Citation
-
-```
-Argo (2024). Argo float data and metadata from Global Data 
-Assembly Centre (Argo GDAC). SEANOE. 
-https://doi.org/10.17882/42182
-```
+<p align="center">
+  <b>Built with ❤️ for Smart India Hackathon 2026</b><br>
+  <i>Democratizing Ocean Science through Artificial Intelligence & 3D Web Visualizations</i>
+</p>
