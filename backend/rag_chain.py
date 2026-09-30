@@ -2,28 +2,25 @@
 backend/rag_chain.py
 ---------------------
 RAG pipeline: semantic search over ARGO profiles + Groq LLM for answers.
+Lightweight & robust for cloud deployment (pure NumPy fallback without heavy torch requirement).
 """
 
 from __future__ import annotations
 
-try:
-    import torch  # noqa: F401  -- must be first on Windows to avoid DLL issues
-except (ImportError, OSError):
-    pass
 import json
 import os
+import re
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Optional
 
-from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 INDEX_DIR = Path("data/faiss_index")
 DATA_PATH = Path("data/processed/argo_indian_ocean.parquet")
 
-_model: Optional[SentenceTransformer] = None
+_model = None
 _summaries: Optional[list] = None
 _embeddings: Optional[np.ndarray] = None
 _df: Optional[pd.DataFrame] = None
@@ -31,12 +28,6 @@ _df: Optional[pd.DataFrame] = None
 
 def _load_resources():
     global _model, _summaries, _embeddings, _df
-
-    if _model is None:
-        try:
-            _model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
-        except Exception:
-            _model = SentenceTransformer("all-MiniLM-L6-v2")
 
     if _summaries is None:
         summary_path = INDEX_DIR / "summaries.json"
@@ -49,41 +40,66 @@ def _load_resources():
     if _embeddings is None:
         emb_path = INDEX_DIR / "embeddings.npy"
         if emb_path.exists():
-            _embeddings = np.load(str(emb_path))
-        elif _summaries:
-            texts = [s["text"] for s in _summaries]
-            _embeddings = _model.encode(texts, batch_size=64)
-            _embeddings = np.array(_embeddings, dtype="float32")
+            try:
+                _embeddings = np.load(str(emb_path))
+            except Exception:
+                _embeddings = None
 
     if _df is None and DATA_PATH.exists():
-        _df = pd.read_parquet(DATA_PATH)
+        try:
+            _df = pd.read_parquet(DATA_PATH)
+        except Exception:
+            _df = None
+
+    # Try loading sentence-transformers if available
+    if _model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception:
+            _model = False
+
+
+def _keyword_search(query: str, top_k: int = 5) -> list[dict]:
+    """Fast keyword/BM25-style search over ARGO summaries without torch/transformers."""
+    if not _summaries:
+        return []
+    
+    words = [w.lower() for w in re.findall(r"\w+", query) if len(w) > 2]
+    if not words:
+        return _summaries[:top_k]
+    
+    scores = []
+    for s in _summaries:
+        text = s.get("text", "").lower()
+        score = sum(text.count(w) * (3 if w in ["arabian", "bengal", "salinity", "temperature", "sst", "depth"] else 1) for w in words)
+        scores.append(score)
+    
+    ranked_indices = np.argsort(scores)[::-1][:top_k]
+    return [_summaries[i] for i in ranked_indices if scores[i] > 0] or _summaries[:top_k]
 
 
 def semantic_search(query: str, top_k: int = 5) -> list[dict]:
     """Find most relevant ARGO profiles for a query."""
     _load_resources()
-    if not _summaries or _embeddings is None:
+    if not _summaries:
         return []
 
-    query_vec = _model.encode([query], convert_to_numpy=True).astype("float32")
+    # If neural embedding model is loaded, use vector search
+    if _model and _embeddings is not None:
+        try:
+            query_vec = _model.encode([query], convert_to_numpy=True).astype("float32")
+            norms = np.linalg.norm(_embeddings, axis=1, keepdims=True) + 1e-9
+            normed = _embeddings / norms
+            qnorm = query_vec / (np.linalg.norm(query_vec) + 1e-9)
+            sims = normed @ qnorm.T
+            top_idx = np.argsort(sims[:, 0])[::-1][:top_k]
+            return [_summaries[i] for i in top_idx]
+        except Exception:
+            pass
 
-    try:
-        import faiss
-        index_path = INDEX_DIR / "argo.index"
-        if index_path.exists():
-            index = faiss.read_index(str(index_path))
-            _, indices = index.search(query_vec, top_k)
-            return [_summaries[i] for i in indices[0] if i < len(_summaries)]
-    except ImportError:
-        pass
-
-    # Numpy fallback cosine similarity
-    norms = np.linalg.norm(_embeddings, axis=1, keepdims=True) + 1e-9
-    normed = _embeddings / norms
-    qnorm = query_vec / (np.linalg.norm(query_vec) + 1e-9)
-    sims = normed @ qnorm.T
-    top_idx = np.argsort(sims[:, 0])[::-1][:top_k]
-    return [_summaries[i] for i in top_idx]
+    # Lightweight fallback
+    return _keyword_search(query, top_k=top_k)
 
 
 def get_data_summary(query: str) -> str:
@@ -94,7 +110,6 @@ def get_data_summary(query: str) -> str:
 
     df = _df
     summary_parts = []
-
     ql = query.lower()
 
     # Filter by region if mentioned
@@ -136,13 +151,12 @@ def get_data_summary(query: str) -> str:
 
 def answer_query(query: str, groq_api_key: str) -> str:
     """Full RAG pipeline: retrieve context + generate answer with Groq LLM."""
-    # Retrieve relevant profiles
     results = semantic_search(query, top_k=5)
     data_summary = get_data_summary(query)
 
-    context = "\n".join([r["text"] for r in results]) if results else "No specific profiles found."
+    context = "\n".join([r.get("text", "") for r in results]) if results else "No specific profiles found."
 
-    system_prompt = """You are FloatChat, an expert oceanography assistant specializing in ARGO float data 
+    system_prompt = """You are FloatChat (Outrage AI), an expert oceanography assistant specializing in ARGO float data 
 from the Indian Ocean. Answer questions about ocean temperature, salinity, float trajectories, 
 and oceanographic patterns using the provided context. Be precise with numbers and scientific.
 If you don't have enough data to answer accurately, say so clearly."""
