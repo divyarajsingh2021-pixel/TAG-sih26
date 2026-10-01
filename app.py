@@ -580,15 +580,23 @@ with col_left:
         unsafe_allow_html=True
     )
 
-    # Suggested Prompts (chips) — dynamically use selected ocean
+    # Suggested Prompts (chips) — dynamic high-impact ocean queries
     st.markdown("<div style='font-size: 12px; font-weight: 600; color: #94a3b8; padding: 2px 0;'>💡 Quick queries:</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     chip_region = sel_ocean if sel_ocean != "All" else "Arabian Sea"
-    if c1.button(f"SST in {chip_region}?", key="chip_1", use_container_width=True):
-        st.session_state.prefill = f"What is the average sea surface temperature in the {chip_region}?"
+    if c1.button(f"🌡️ SST in {chip_region}?", key="chip_1", use_container_width=True):
+        st.session_state.prefill = f"What is the average sea surface temperature and depth profile in the {chip_region}?"
         st.rerun()
-    if c2.button("Salinity near equator", key="chip_2", use_container_width=True):
-        st.session_state.prefill = f"Show me salinity profile near the equator in the {chip_region}"
+    if c2.button("🌪️ Cyclone Heat Potential", key="chip_2", use_container_width=True):
+        st.session_state.prefill = f"Analyze cyclone heat potential and thermocline depth in the {chip_region}."
+        st.rerun()
+
+    c3, c4 = st.columns(2)
+    if c3.button("🌊 Compare BoB vs Arabian Sea", key="chip_3", use_container_width=True):
+        st.session_state.prefill = "Compare temperature and salinity between Arabian Sea and Bay of Bengal."
+        st.rerun()
+    if c4.button("📍 Active Float Drift", key="chip_4", use_container_width=True):
+        st.session_state.prefill = "Show me active float trajectories and geostrophic current circulation patterns."
         st.rerun()
 
     # Chat Messages Stream
@@ -652,18 +660,8 @@ with col_left:
         q_reg = sel_ocean  # Use user's selected ocean region
         q_m = extract_month(q_final)
 
-        with st.spinner("⚡ Outrage is thinking..."):
-            if not st.session_state.groq_key:
-                sdf = surface[surface["region"] == q_reg] if q_reg != "All" else surface
-                bot_ans = (
-                    f"📊 **Data for {q_reg}:**\n\n"
-                    f"- Mean SST: **{sdf['temperature_c'].mean():.2f}°C**\n"
-                    f"- Mean Salinity: **{sdf['salinity_psu'].mean():.2f} PSU**\n"
-                    f"- Float Profiles: **{sdf['profile_id'].nunique():,}**\n\n"
-                    f"*Enter your Groq API key above for full AI-powered answers!*"
-                )
-            else:
-                bot_ans = answer_query(q_final, st.session_state.groq_key)
+        with st.spinner("⚡ Outrage is analyzing oceanographic data..."):
+            bot_ans = answer_query(q_final, st.session_state.groq_key)
 
         st.session_state.messages.append({"role": "assistant", "content": bot_ans, "time": curr_time})
 
@@ -942,6 +940,30 @@ with col_right:
                     plot_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
+
+            # ── Disaster Warning & Export Row ──
+            exp_col1, exp_col2 = st.columns([2.2, 1.2])
+            with exp_col1:
+                is_cyclone_warm = avg_sst >= 28.0
+                cyclone_status = "⚠️ Active Thermodynamic Fuel Zone (SST ≥ 28.0°C - Tropical Cyclogenesis Risk)" if is_cyclone_warm else "🟢 Moderate Thermal Range (< 28.0°C)"
+                badge_bg = "rgba(239, 68, 68, 0.15)" if is_cyclone_warm else "rgba(16, 185, 129, 0.15)"
+                badge_border = "#ef4444" if is_cyclone_warm else "#10b981"
+                badge_text = "#fca5a5" if is_cyclone_warm else "#6ee7b7"
+                st.markdown(f"""
+                <div style="background:{badge_bg}; border:1px solid {badge_border}; border-radius:8px; padding:9px 12px; font-size:12px; color:{badge_text}; margin-top:8px;">
+                  <b>Disaster Advisory:</b> {cyclone_status}
+                </div>
+                """, unsafe_allow_html=True)
+            with exp_col2:
+                st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+                csv_data = surface[["float_id", "profile_id", "latitude", "longitude", "temperature_c", "salinity_psu", "region"]].head(1000).to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Export ARGO CSV",
+                    data=csv_data,
+                    file_name=f"argo_floats_{sel_ocean.lower().replace(' ', '_')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
 
         # ── TAB 2: TEMPORAL ───────────────────────────────────────────────────
         with tab_temporal:
