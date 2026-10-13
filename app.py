@@ -535,20 +535,22 @@ with col_left:
         st.session_state.stop_voice = False
 
     # API key setup (in sleek expander)
-    with st.expander("🔑 Groq API Key Config", expanded=not bool(st.session_state.groq_key)):
+    has_secret_key = bool(st.session_state.groq_key)
+    with st.expander("🔑 Groq API Key Config", expanded=False):
         key_input = st.text_input(
             "API Key:",
-            value=st.session_state.groq_key,
+            value="",
             type="password",
-            placeholder="gsk_xxxxxxxxxxxxxxxxxxxx",
+            placeholder="Key active via secrets" if has_secret_key else "gsk_xxxxxxxxxxxxxxxxxxxx",
             label_visibility="collapsed",
+            help="Your API key remains securely in Streamlit Secrets or session state."
         )
         if key_input:
-            st.session_state.groq_key = key_input
+            st.session_state.groq_key = key_input.strip()
         if st.session_state.groq_key:
             st.success("✅ Groq Key Active (Qwen-27B)")
         else:
-            st.warning("⚠️ Enter key for AI generation")
+            st.info("ℹ️ Using Built-in Offline Ocean Engine (or enter your Groq key)")
 
     # ── Ocean Region Selector ─────────────────────────────────────────────────
     st.markdown("""
